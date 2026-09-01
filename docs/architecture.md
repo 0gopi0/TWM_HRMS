@@ -184,15 +184,13 @@ Route families later: `auth`, `me`, `employees`, `leave`, `payroll`, `org`.
 - Connection pool; read replicas later for reports only
 - Heavy work (bulk payslips, import) → queue + worker later
 
-## Repo layout (when code starts)
+## Repo layout
 
 ```
-apps/web
-apps/api
-packages/shared
+frontend/          React (Vite, ESM)
+backend/           Express (ESM)
+packages/shared    Shared role and permission codes
 ```
-
-Or `frontend/` + `backend/`.
 
 ## Out of scope for this foundation
 
