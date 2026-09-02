@@ -1,5 +1,5 @@
 {
-  "0": "getStore",
+  "0": "HttpError",
   "1": "shared/index.js",
   "2": "TWM HRMS Architecture",
   "3": "store/index.js",
@@ -7,10 +7,10 @@
   "5": "PayrollPage.jsx",
   "6": "dependencies",
   "7": "frontend/package.json",
-  "8": "leaveService.js",
+  "8": "getStore",
   "9": "What You Must Do When Invoked",
   "10": "001_schema.sql",
-  "11": "scripts",
+  "11": "package.json",
   "12": "graphify reference: extra exports and benchmark",
   "13": "graphify reference: query, path, explain",
   "14": "shared/package.json",
@@ -32,7 +32,7 @@
   "30": "vite.config.js",
   "31": "setup-local-mysql.sql",
   "32": "ThemeSwitch.jsx",
-  "33": "api",
+  "33": "payrollService.js",
   "34": "OrgChart.jsx",
   "35": "verify_status.mjs",
   "36": "e2e_org.mjs",
@@ -53,13 +53,5 @@
   "51": "shot_login.mjs",
   "52": "verify_green.mjs",
   "53": "007_payslip_items.sql",
-  "54": "leave_requests",
-  "55": "auth.jsx",
-  "56": "EmployeesPage.jsx",
-  "57": "App.jsx",
-  "58": "DashboardPage.jsx",
-  "59": "Deploying to Hostinger Business (Node.js hosting)",
-  "60": "CalendarPage.jsx",
-  "61": "password_reset_tokens",
-  "62": "ApprovalsPage"
+  "54": "leave_requests"
 }

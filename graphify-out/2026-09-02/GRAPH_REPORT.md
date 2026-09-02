@@ -1,21 +1,21 @@
-# Graph Report - TWM HRMS  (2026-09-02)
+# Graph Report - TWM HRMS  (2026-09-01)
 
 ## Corpus Check
-- 103 files · ~58,421 words
+- 95 files · ~50,335 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 619 nodes · 1131 edges · 63 communities (44 shown, 19 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 31 edges (avg confidence: 0.83)
+- 553 nodes · 973 edges · 55 communities (37 shown, 18 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 29 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `aff95f1b`
+- Built from commit: `d2640316`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- getStore
+- HttpError
 - shared/index.js
 - TWM HRMS Architecture
 - store/index.js
@@ -23,10 +23,10 @@
 - PayrollPage.jsx
 - dependencies
 - frontend/package.json
-- leaveService.js
+- getStore
 - What You Must Do When Invoked
 - 001_schema.sql
-- scripts
+- package.json
 - graphify reference: extra exports and benchmark
 - graphify reference: query, path, explain
 - shared/package.json
@@ -44,7 +44,7 @@
 - employees
 - The Website Makers Logo
 - ThemeSwitch.jsx
-- api
+- payrollService.js
 - OrgChart.jsx
 - verify_status.mjs
 - e2e_org.mjs
@@ -56,38 +56,30 @@
 - e2e_leave.mjs
 - hover_click.mjs
 - leave_requests
-- auth.jsx
-- EmployeesPage.jsx
-- App.jsx
-- DashboardPage.jsx
-- Deploying to Hostinger Business (Node.js hosting)
-- CalendarPage.jsx
-- password_reset_tokens
-- ApprovalsPage
 
 ## God Nodes (most connected - your core abstractions)
-1. `getStore()` - 47 edges
-2. `HttpError` - 45 edges
-3. `api()` - 34 edges
-4. `/graphify` - 28 edges
-5. `useAuth()` - 23 edges
-6. `EmployeesPage()` - 16 edges
-7. `TWM HRMS Architecture` - 14 edges
-8. `PayrollPage()` - 13 edges
-9. `PERMISSIONS` - 13 edges
-10. `DashboardPage()` - 12 edges
+1. `HttpError` - 37 edges
+2. `getStore()` - 36 edges
+3. `/graphify` - 28 edges
+4. `api()` - 26 edges
+5. `useAuth()` - 21 edges
+6. `TWM HRMS Architecture` - 14 edges
+7. `PayrollPage()` - 12 edges
+8. `PERMISSIONS` - 12 edges
+9. `What You Must Do When Invoked` - 12 edges
+10. `employees` - 11 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Audit Trail (EXTRACTED/INFERRED/AMBIGUOUS)` --semantically_similar_to--> `Append-only audit_logs`  [INFERRED] [semantically similar]
   .agents/skills/graphify/SKILL.md → docs/architecture.md
 - `Editorial Serif + Clean Sans Typography` --semantically_similar_to--> `TWM HRMS Theme`  [INFERRED] [semantically similar]
   .commandcode/taste/taste.md → frontend/index.html
-- `AppShell()` --calls--> `labelForRole()`  [EXTRACTED]
-  frontend/src/AppShell.jsx → packages/shared/index.js
 - `TWM HRMS` --conceptually_related_to--> `React SPA Entry (index.html)`  [INFERRED]
   README.md → frontend/index.html
 - `React SPA Entry (index.html)` --conceptually_related_to--> `React + Express + MySQL Stack`  [INFERRED]
   frontend/index.html → README.md
+- `authorize()` --calls--> `hasPermission()`  [EXTRACTED]
+  backend/src/middleware/authorize.js → packages/shared/index.js
 
 ## Import Cycles
 - None detected.
@@ -97,15 +89,15 @@
 - **Document Extraction Pipeline** — _agents_skills_graphify_skill_ast_extraction, _agents_skills_graphify_skill_semantic_extraction, _agents_skills_graphify_skill_graph_json [INFERRED 0.85]
 - **Role-Based Access Control Model** — docs_architecture_roles, docs_architecture_rbac, docs_architecture_permission_codes [INFERRED 0.85]
 
-## Communities (63 total, 19 thin omitted)
+## Communities (55 total, 18 thin omitted)
 
-### Community 0 - "getStore"
-Cohesion: 0.06
-Nodes (70): createApp(), frontendDist, attachEmployee(), authenticate(), authorize(), errorHandler(), notFound(), requestId() (+62 more)
+### Community 0 - "HttpError"
+Cohesion: 0.11
+Nodes (33): createApp(), attachEmployee(), authenticate(), authorize(), errorHandler(), notFound(), requestId(), validate() (+25 more)
 
 ### Community 1 - "shared/index.js"
-Cohesion: 0.11
-Nodes (21): buildOrgForest(), computeStatusById(), getOrgChart(), DEPARTMENTS, salaryFor(), TEAMS, DEMO_GROUPS, groupDemoAccounts() (+13 more)
+Cohesion: 0.05
+Nodes (70): buildOrgForest(), computeStatusById(), getOrgChart(), api(), setAccessToken(), setOnSaved(), App(), EmployeesRoute() (+62 more)
 
 ### Community 2 - "TWM HRMS Architecture"
 Cohesion: 0.06
@@ -113,7 +105,7 @@ Nodes (34): Audit Trail (EXTRACTED/INFERRED/AMBIGUOUS), Visible Save-Confirmatio
 
 ### Community 3 - "store/index.js"
 Cohesion: 0.11
-Nodes (27): env, isProd, parsed, root, schema, dir, migrate(), closePool() (+19 more)
+Nodes (25): env, isProd, parsed, root, schema, dir, migrate(), closePool() (+17 more)
 
 ### Community 4 - "/graphify"
 Cohesion: 0.07
@@ -121,19 +113,19 @@ Nodes (34): graphify add (URL ingest), --watch folder watcher, Graph Exports (wi
 
 ### Community 5 - "PayrollPage.jsx"
 Cohesion: 0.14
-Nodes (22): currentPeriod(), EXCLUDED_FROM_PAYROLL, fmtInr(), newEmptyExtra(), PAYROLL_OPERATORS, PayrollPage(), load(), removePayslip() (+14 more)
+Nodes (21): currentPeriod(), EXCLUDED_FROM_PAYROLL, fmtInr(), newEmptyExtra(), PAYROLL_OPERATORS, PayrollPage(), load(), submit() (+13 more)
 
 ### Community 6 - "dependencies"
 Cohesion: 0.06
-Nodes (35): dependencies, bcrypt, compression, cookie-parser, cors, dotenv, express, express-rate-limit (+27 more)
+Nodes (33): dependencies, bcrypt, compression, cookie-parser, cors, dotenv, express, express-rate-limit (+25 more)
 
 ### Community 7 - "frontend/package.json"
 Cohesion: 0.09
 Nodes (21): dependencies, react, react-dom, react-router-dom, @twm/shared, devDependencies, vite, @vitejs/plugin-react (+13 more)
 
-### Community 8 - "leaveService.js"
-Cohesion: 0.25
-Nodes (17): assertHalfDay(), assertHasBalance(), assertLeaveWindow(), asYmd(), createLeaveRequest(), createManagedLeave(), daysConsumed(), daysUntil() (+9 more)
+### Community 8 - "getStore"
+Cohesion: 0.13
+Nodes (33): withRejectionReasons(), clockIn(), clockOut(), dayKey(), getAttendanceStatus(), listAllAttendance(), mapEntry(), issueSession() (+25 more)
 
 ### Community 9 - "What You Must Do When Invoked"
 Cohesion: 0.13
@@ -143,9 +135,9 @@ Nodes (15): Part A - Structural extraction for code files, Part B - Semantic ext
 Cohesion: 0.19
 Nodes (16): audit_logs, departments, employees, leave_approvals, leave_requests, payment_runs, payslips, permissions (+8 more)
 
-### Community 11 - "scripts"
-Cohesion: 0.11
-Nodes (17): allowScripts, bcrypt@5.1.1, esbuild@0.25.12, name, private, scripts, build, db:migrate (+9 more)
+### Community 11 - "package.json"
+Cohesion: 0.12
+Nodes (15): allowScripts, bcrypt@5.1.1, esbuild@0.25.12, name, private, scripts, db:migrate, dev (+7 more)
 
 ### Community 12 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -177,11 +169,11 @@ Nodes (3): Design & UI, Taste, Workflow
 
 ### Community 32 - "ThemeSwitch.jsx"
 Cohesion: 0.21
-Nodes (6): ForgotPasswordPage(), ResetPasswordPage(), useTheme(), OPTIONS, SignOutButton(), ThemeSwitch()
+Nodes (7): applyTheme(), ThemeContext, ThemeProvider(), useTheme(), OPTIONS, SignOutButton(), ThemeSwitch()
 
-### Community 33 - "api"
-Cohesion: 0.17
-Nodes (17): api(), load(), punch(), addDaysYmd(), daysInclusive(), emptyQuota(), emptyRequest(), EXCLUDED_FROM_LEAVE_MANAGEMENT (+9 more)
+### Community 33 - "payrollService.js"
+Cohesion: 0.24
+Nodes (10): computePay(), createPayslip(), EXCLUDED_FROM_PAYROLL, listPayslips(), PAYROLL_OPERATORS, PAYROLL_VIEW_ALL, round2(), runPayment() (+2 more)
 
 ### Community 34 - "OrgChart.jsx"
 Cohesion: 0.29
@@ -191,53 +183,25 @@ Nodes (7): findNode(), findParent(), initialsFor(), OrgChart(), OrgDetail(), Org
 Cohesion: 0.29
 Nodes (5): api(), from, login(), T, to
 
-### Community 55 - "auth.jsx"
-Cohesion: 0.18
-Nodes (11): setAccessToken(), setOnSaved(), App(), AuthContext, AuthProvider(), loadMe(), applyTheme(), ThemeContext (+3 more)
-
-### Community 56 - "EmployeesPage.jsx"
-Cohesion: 0.21
-Nodes (16): dayKey(), EmployeesPage(), cancelEdit(), closeLopModal(), load(), openLopModal(), removeEmployee(), startEdit() (+8 more)
-
-### Community 57 - "App.jsx"
-Cohesion: 0.24
-Nodes (11): EmployeesRoute(), Guard(), LeaveRoute(), AppShell(), Icons, navAllowed(), stroke, TOP_NAV (+3 more)
-
-### Community 58 - "DashboardPage.jsx"
-Cohesion: 0.28
-Nodes (11): DashboardPage(), dayKey(), daysInclusive(), fmtDuration(), formatTime(), greet(), inMonth(), fmtDate() (+3 more)
-
-### Community 59 - "Deploying to Hostinger Business (Node.js hosting)"
-Cohesion: 0.18
-Nodes (10): 1. Create the database, 2. Create the Node.js app, 3. Get the code onto the server, 4. Set environment variables, 5. Install, build, migrate, 6. Start the app, Deploying to Hostinger Business (Node.js hosting), Redeploying after a code change (+2 more)
-
-### Community 60 - "CalendarPage.jsx"
-Cohesion: 0.31
-Nodes (9): buildCells(), CalendarPage(), load(), monthLabel(), pad(), shiftMonth(), todayYmd(), WEEKDAYS (+1 more)
-
-### Community 62 - "ApprovalsPage"
-Cohesion: 1.00
-Nodes (3): ApprovalsPage(), decide(), load()
-
 ## Knowledge Gaps
-- **190 isolated node(s):** `Taste`, `name`, `version`, `type`, `main` (+185 more)
+- **173 isolated node(s):** `btn`, `active`, `aman`, `navText`, `userText` (+168 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `api()` connect `api` to `ThemeSwitch.jsx`, `PayrollPage.jsx`, `auth.jsx`, `EmployeesPage.jsx`, `App.jsx`, `DashboardPage.jsx`, `CalendarPage.jsx`, `ApprovalsPage`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
-- **Why does `getStore()` connect `getStore` to `leaveService.js`, `shared/index.js`, `store/index.js`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **Why does `PERMISSIONS` connect `getStore` to `shared/index.js`, `api`, `PayrollPage.jsx`, `EmployeesPage.jsx`, `App.jsx`, `CalendarPage.jsx`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **What connects `Taste`, `name`, `version` to the rest of the system?**
-  _190 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `getStore` be split into smaller, more focused modules?**
-  _Cohesion score 0.059025394646533974 - nodes in this community are weakly interconnected._
+- **Why does `PERMISSIONS` connect `HttpError` to `shared/index.js`, `store/index.js`, `PayrollPage.jsx`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **Why does `getStore()` connect `getStore` to `HttpError`, `shared/index.js`, `store/index.js`, `payrollService.js`?**
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Why does `api()` connect `shared/index.js` to `PayrollPage.jsx`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **What connects `btn`, `active`, `aman` to the rest of the system?**
+  _173 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `HttpError` be split into smaller, more focused modules?**
+  _Cohesion score 0.10784313725490197 - nodes in this community are weakly interconnected._
 - **Should `shared/index.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.11384615384615385 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.050436953807740326 - nodes in this community are weakly interconnected._
 - **Should `TWM HRMS Architecture` be split into smaller, more focused modules?**
   _Cohesion score 0.06306306306306306 - nodes in this community are weakly interconnected._
