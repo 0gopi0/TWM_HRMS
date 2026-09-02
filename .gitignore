@@ -1,0 +1,10 @@
+.env
+*.log
+node_modules/
+dist/
+.DS_Store
+frontend/dist
+backend/.env
+
+graphify-out/cost.json
+graphify-out/cache/last_query_stamp
