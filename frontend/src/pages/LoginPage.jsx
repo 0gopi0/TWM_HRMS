@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@twm/shared";
 import { useAuth } from "../auth.jsx";
 import { ThemeSwitch } from "../ThemeSwitch.jsx";
@@ -134,6 +134,9 @@ export function LoginPage() {
               </button>
             </span>
           </label>
+          <p className="muted" style={{ margin: "-8px 0 0", fontSize: 13 }}>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </p>
 
           <div className="people-tabs-wrap">
             <p className="people-tabs-label">Demo people</p>

@@ -29,6 +29,12 @@ function mapEmployee(row) {
     managerId: row.manager_id,
     leaveApproverId: row.leave_approver_id,
     employmentStatus: row.employment_status,
+    // Only present when the query joins users (e.g. listEmployees) — lets
+    // the frontend filter "who can be a leave approver" by seniority, and
+    // pre-fill email on the edit form. The route strips email back out
+    // before responding unless the requester can manage employees.
+    role: row.role_code ?? undefined,
+    email: row.email ?? undefined,
   };
 }
 
@@ -124,6 +130,24 @@ export async function createMysqlStore() {
     async touchLogin(userId) {
       await pool.query("UPDATE users SET last_login_at = NOW() WHERE id = ?", [userId]);
     },
+    async updateUserPassword(userId, passwordHash) {
+      await pool.query("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, userId]);
+    },
+    async updateUserRole(userId, role) {
+      await pool.query("UPDATE users SET role_code = ? WHERE id = ?", [role, userId]);
+    },
+    async updateUserEmail(userId, email) {
+      try {
+        await pool.query("UPDATE users SET email = ? WHERE id = ?", [email, userId]);
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          const e = new Error("Email is already in use");
+          e.code = "DUPLICATE_EMAIL";
+          throw e;
+        }
+        throw err;
+      }
+    },
     async saveRefreshToken({ userId, token, expiresAt }) {
       await pool.query(
         "INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
@@ -151,8 +175,32 @@ export async function createMysqlStore() {
         userId,
       ]);
     },
+    // Requesting a new reset link invalidates any previous unused ones for
+    // that user, so only the newest link a person requested ever works.
+    async createPasswordResetToken({ id, userId, tokenHash, expiresAt }) {
+      await pool.query("DELETE FROM password_reset_tokens WHERE user_id = ? AND used_at IS NULL", [userId]);
+      await pool.query(
+        "INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
+        [id, userId, tokenHash, expiresAt],
+      );
+    },
+    async getPasswordResetToken(tokenHash) {
+      const [rows] = await pool.query("SELECT * FROM password_reset_tokens WHERE token_hash = ? LIMIT 1", [
+        tokenHash,
+      ]);
+      const r = rows[0];
+      if (!r) return null;
+      return { id: r.id, userId: r.user_id, expiresAt: r.expires_at, usedAt: r.used_at };
+    },
+    async markPasswordResetTokenUsed(tokenHash) {
+      await pool.query("UPDATE password_reset_tokens SET used_at = NOW() WHERE token_hash = ?", [tokenHash]);
+    },
     async listEmployees() {
-      const [rows] = await pool.query("SELECT * FROM employees ORDER BY employee_number");
+      const [rows] = await pool.query(
+        `SELECT e.*, u.role_code, u.email FROM employees e
+         LEFT JOIN users u ON u.id = e.user_id
+         ORDER BY e.employee_number`,
+      );
       return rows.map(mapEmployee);
     },
     async getEmployeeById(id) {
@@ -162,6 +210,93 @@ export async function createMysqlStore() {
     async getEmployeeByUserId(userId) {
       const [rows] = await pool.query("SELECT * FROM employees WHERE user_id = ? LIMIT 1", [userId]);
       return mapEmployee(rows[0]);
+    },
+    async listDepartments() {
+      const [rows] = await pool.query("SELECT id, name FROM departments ORDER BY name");
+      return rows.map((r) => ({ id: r.id, name: r.name }));
+    },
+    async listTeams() {
+      const [rows] = await pool.query("SELECT id, name, department_id, leader_employee_id FROM teams ORDER BY name");
+      return rows.map((r) => ({ id: r.id, name: r.name, departmentId: r.department_id, leaderEmployeeId: r.leader_employee_id }));
+    },
+    // Provisions the login (users) and the HR record (employees) for a new
+    // person in one transaction, so a duplicate email can't leave an
+    // orphaned employee row (or vice versa).
+    async createEmployeeWithUser({ user, employee }) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query(
+          "INSERT INTO users (id, email, password_hash, role_code, is_active) VALUES (?, ?, ?, ?, 1)",
+          [user.id, user.email, user.passwordHash, user.role],
+        );
+        await conn.query(
+          `INSERT INTO employees
+           (id, user_id, employee_number, legal_name, job_title, department_id, team_id, manager_id, leave_approver_id, employment_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            employee.id,
+            user.id,
+            employee.employeeNumber,
+            employee.legalName,
+            employee.jobTitle || null,
+            employee.departmentId,
+            employee.teamId || null,
+            employee.managerId || null,
+            employee.leaveApproverId || null,
+            "active",
+          ],
+        );
+        await conn.commit();
+      } catch (err) {
+        await conn.rollback();
+        if (err.code === "ER_DUP_ENTRY" && err.message.includes("email")) {
+          const e = new Error("Email is already in use");
+          e.code = "DUPLICATE_EMAIL";
+          throw e;
+        }
+        throw err;
+      } finally {
+        conn.release();
+      }
+      return { ...employee, employmentStatus: "active" };
+    },
+    async updateEmployee(id, { legalName, jobTitle, departmentId, teamId, managerId, leaveApproverId }) {
+      await pool.query(
+        `UPDATE employees
+         SET legal_name = ?, job_title = ?, department_id = ?, team_id = ?, manager_id = ?, leave_approver_id = ?
+         WHERE id = ?`,
+        [legalName, jobTitle || null, departmentId, teamId || null, managerId || null, leaveApproverId || null, id],
+      );
+    },
+    async deleteEmployee(id) {
+      const emp = await this.getEmployeeById(id);
+      if (!emp) return false;
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query("DELETE FROM employees WHERE id = ?", [id]);
+        if (emp.userId) {
+          // Session artifacts, not business history — always safe to drop
+          // so a stray login doesn't block deleting a mistaken hire.
+          await conn.query("DELETE FROM refresh_tokens WHERE user_id = ?", [emp.userId]);
+          await conn.query("DELETE FROM users WHERE id = ?", [emp.userId]);
+        }
+        await conn.commit();
+        return true;
+      } catch (err) {
+        await conn.rollback();
+        if (err.code === "ER_ROW_IS_REFERENCED_2" || err.code === "ER_ROW_IS_REFERENCED") {
+          const e = new Error(
+            "This person has related records (leave, attendance, payroll, audit history, or they're set as someone's manager/lead/approver) and can't be deleted",
+          );
+          e.code = "REFERENCED";
+          throw e;
+        }
+        throw err;
+      } finally {
+        conn.release();
+      }
     },
     async listLeave() {
       const [rows] = await pool.query("SELECT * FROM leave_requests ORDER BY created_at DESC");
@@ -296,6 +431,10 @@ export async function createMysqlStore() {
         }
         throw err;
       }
+    },
+    async deletePayslip(id) {
+      const [result] = await pool.query("DELETE FROM payslips WHERE id = ?", [id]);
+      return result.affectedRows > 0;
     },
     async findPaymentRunByKey(key) {
       const [rows] = await pool.query("SELECT * FROM payment_runs WHERE idempotency_key = ? LIMIT 1", [key]);

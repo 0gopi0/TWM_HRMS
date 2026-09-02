@@ -4,6 +4,7 @@ Employee management HRMS: React (Vite) + Express (ES modules) + MySQL.
 
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - Local database: [docs/local-setup.md](docs/local-setup.md)
+- Deploying to Hostinger: [docs/deploy-hostinger.md](docs/deploy-hostinger.md)
 
 ## Run locally
 

@@ -20,8 +20,8 @@ server.on("error", (err) => {
 
 async function start() {
   await initStore();
-  server.listen(env.PORT, "127.0.0.1", () => {
-    console.log(`API listening on http://127.0.0.1:${env.PORT}`);
+  server.listen(env.PORT, env.HOST, () => {
+    console.log(`API listening on http://${env.HOST}:${env.PORT}`);
   });
 }
 

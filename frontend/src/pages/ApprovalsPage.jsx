@@ -59,9 +59,9 @@ export function ApprovalsPage() {
           <h2>Pending decisions</h2>
         </div>
         {loading ? (
-          <p className="muted" style={{ padding: "8px 4px 4px" }}>Loading…</p>
+          <p className="muted" style={{ padding: "24px 22px" }}>Loading…</p>
         ) : approvals.length === 0 ? (
-          <p className="muted" style={{ padding: "8px 4px 4px" }}>No requests waiting on you right now.</p>
+          <p className="muted" style={{ padding: "24px 22px" }}>No requests waiting on you right now.</p>
         ) : (
           <div className="table-wrap">
             <table>

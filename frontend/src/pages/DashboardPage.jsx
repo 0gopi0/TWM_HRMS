@@ -2,10 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { LEAVE_TYPE_LABELS, ROLES } from "@twm/shared";
 import { useAuth } from "../auth.jsx";
 import { api } from "../api.js";
+import { SparkIcon, LeaveTypeBadge, fmtDate } from "../ui.jsx";
 
 function formatTime(value) {
   if (!value) return "—";
   return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function fmtDuration(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}m`;
+  return m ? `${h}h ${m}m` : `${h}h`;
 }
 
 function daysInclusive(start, end) {
@@ -20,12 +28,10 @@ function inMonth(value) {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth();
 }
 
-function SparkIcon({ d, size = 18 }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {d}
-    </svg>
-  );
+function dayKey(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  return d.toLocaleDateString("en-CA");
 }
 
 export function DashboardPage() {
@@ -33,33 +39,59 @@ export function DashboardPage() {
   const name = user?.employee?.legalName || user?.email;
   const roleLabel = user?.employee?.jobTitle || "";
   const isOwner = user?.role === ROLES.OWNER;
+  // Org stat cards only for roles the backend gives company-wide leave,
+  // attendance, and payslip visibility to (owner / HR). Admins see scoped
+  // leave, so company-wide numbers would be wrong for them.
+  const canViewOrg = isOwner || user?.role === ROLES.HR;
   const [attendance, setAttendance] = useState(null);
   const [leaves, setLeaves] = useState([]);
   const [balances, setBalances] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [attendanceAll, setAttendanceAll] = useState([]);
+  const [payslips, setPayslips] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  // Ticks so the on-shift elapsed time stays live on the status card.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     async function load() {
       try {
         const att = await api("/api/v1/attendance");
         setAttendance(att);
-        // The owner has no one to apply leave to, so there's no leave
-        // balance or history to show on their dashboard.
-        if (isOwner) return;
         const year = new Date().getFullYear();
-        const [lvs, bal] = await Promise.all([
+        // The owner has no one to apply leave to, so there's no leave
+        // balance to show on their dashboard.
+        const [lvs, bal, org] = await Promise.all([
           api(`/api/v1/leave?pageSize=100`),
-          api(`/api/v1/leave/balances?year=${year}`),
+          isOwner ? Promise.resolve(null) : api(`/api/v1/leave/balances?year=${year}`),
+          canViewOrg
+            ? Promise.all([
+                api("/api/v1/employees?pageSize=100"),
+                api("/api/v1/attendance/all"),
+                api("/api/v1/payroll/payslips"),
+              ])
+            : Promise.resolve(null),
         ]);
         setLeaves(lvs.data || []);
-        setBalances(bal);
+        if (bal) setBalances(bal);
+        if (org) {
+          const [emps, attAll, slips] = org;
+          setEmployees(emps.data || []);
+          setAttendanceAll(attAll.data || []);
+          setPayslips(slips.data || []);
+        }
       } catch (e) {
         setError(e.message);
       }
     }
     load();
-  }, [isOwner]);
+  }, [isOwner, canViewOrg]);
 
   async function punch(path) {
     setBusy(true);
@@ -97,12 +129,29 @@ export function DashboardPage() {
     return balances.items.reduce((sum, item) => sum + (item.remaining ?? 0), 0);
   }, [balances]);
 
-  const todayStatus = onShift ? "In" : doneToday ? "Out" : "—";
-  const todayStatusLabel = onShift
-    ? "On shift"
-    : doneToday
-      ? "Day complete"
-      : "Not started";
+  // Today's status card: tone drives the dot (live = pulsing green),
+  // value is the elapsed/total shift time, trend carries the clock times.
+  const shiftInfo = useMemo(() => {
+    if (!attendance?.clockInAt) {
+      return { tone: "idle", value: "—", trend: "Not clocked in yet" };
+    }
+    const inAt = new Date(attendance.clockInAt).getTime();
+    if (attendance.clockedIn) {
+      const mins = Math.max(0, Math.floor((now - inAt) / 60000));
+      return {
+        tone: "live",
+        value: fmtDuration(mins),
+        trend: `On shift · in at ${formatTime(attendance.clockInAt)}`,
+      };
+    }
+    const outAt = attendance.clockOutAt ? new Date(attendance.clockOutAt).getTime() : null;
+    const mins = outAt ? Math.max(0, Math.round((outAt - inAt) / 60000)) : null;
+    return {
+      tone: "done",
+      value: mins == null ? "—" : fmtDuration(mins),
+      trend: `${formatTime(attendance.clockInAt)} → ${formatTime(attendance.clockOutAt)}`,
+    };
+  }, [attendance, now]);
 
   const totalLeaveAllotted = useMemo(() => {
     if (!balances?.items?.length) return 0;
@@ -113,6 +162,39 @@ export function DashboardPage() {
     if (!balances?.items?.length) return 0;
     return balances.items.reduce((sum, item) => sum + (item.used ?? 0), 0);
   }, [balances]);
+
+  // Org-wide numbers for company-wide viewers (owner / HR).
+  const orgStats = useMemo(() => {
+    if (!canViewOrg) return null;
+    const today = new Date().toLocaleDateString("en-CA");
+    const active = employees.filter((e) => e.employmentStatus === "active").length;
+    const total = employees.length;
+    // Latest attendance entry per employee, preferring today's — same as People page.
+    const latest = new Map();
+    for (const a of attendanceAll) {
+      const day = dayKey(a.clockInAt);
+      const prev = latest.get(a.employeeId);
+      if (!prev || (day === today && prev.day !== today) || a.clockInAt >= prev.clockInAt) {
+        latest.set(a.employeeId, { ...a, day });
+      }
+    }
+    let onShiftNow = 0;
+    let clockedInToday = 0;
+    for (const a of latest.values()) {
+      if (a.day !== today) continue;
+      clockedInToday += 1;
+      if (a.clockInAt && !a.clockOutAt) onShiftNow += 1;
+    }
+    const onLeaveToday = new Set(
+      leaves
+        .filter((l) => l.status === "approved" && l.startDate <= today && l.endDate >= today)
+        .map((l) => l.employeeId),
+    ).size;
+    const pendingApprovals = leaves.filter((l) => String(l.status).startsWith("pending")).length;
+    const month = today.slice(0, 7);
+    const payslipsThisMonth = payslips.filter((p) => String(p.period).slice(0, 7) === month).length;
+    return { active, total, onShiftNow, clockedInToday, onLeaveToday, pendingApprovals, payslipsThisMonth };
+  }, [canViewOrg, employees, attendanceAll, leaves, payslips]);
 
   return (
     <div>
@@ -130,9 +212,98 @@ export function DashboardPage() {
       {error ? <p className="error" style={{ marginBottom: 12 }}>{error}</p> : null}
 
       <div className="dashboard-stack">
+        {/* Org-wide stats — owner / HR only */}
+        {orgStats ? (
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
+            <article className="stat-card amber">
+              <div className="stat-icon">
+                <SparkIcon
+                  d={
+                    <>
+                      <circle cx="12" cy="13" r="8" />
+                      <path d="M12 9.5v3.5l2.5 2.5" />
+                      <path d="M9.5 2h5" />
+                    </>
+                  }
+                />
+              </div>
+              <span className="stat-value">
+                {orgStats.onShiftNow}
+                <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-muted)" }}>
+                  {" / "}
+                  {orgStats.total}
+                </span>
+              </span>
+              <span className="stat-label">On shift now</span>
+              <span className="stat-trend">{orgStats.clockedInToday} clocked in today</span>
+            </article>
+            <article className="stat-card">
+              <div className="stat-icon">
+                <SparkIcon
+                  d={
+                    <>
+                      <rect x="3" y="5" width="18" height="16" rx="2" />
+                      <path d="M3 10h18" />
+                      <path d="M9.5 13.5l5 5M14.5 13.5l-5 5" />
+                    </>
+                  }
+                />
+              </div>
+              <span className="stat-value">{orgStats.onLeaveToday}</span>
+              <span className="stat-label">On leave today</span>
+              <span className="stat-trend">Approved time off</span>
+            </article>
+            <article className="stat-card">
+              <div className="stat-icon">
+                <SparkIcon d={<path d="M4 6h16M4 12h16M4 18h10" />} />
+              </div>
+              <span className="stat-value">{orgStats.pendingApprovals}</span>
+              <span className="stat-label">Pending approvals</span>
+              <span className="stat-trend">Leave awaiting decision</span>
+            </article>
+            <article className="stat-card">
+              <div className="stat-icon">
+                <SparkIcon
+                  d={
+                    <>
+                      <circle cx="9" cy="8" r="3.5" />
+                      <path d="M2.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5" />
+                      <circle cx="17" cy="9" r="2.5" />
+                      <path d="M15.5 15.6c2.5.4 4.4 2 5 4.4" />
+                    </>
+                  }
+                />
+              </div>
+              <span className="stat-value">{orgStats.active}</span>
+              <span className="stat-label">Active employees</span>
+              <span className="stat-trend">{orgStats.total - orgStats.active} inactive</span>
+            </article>
+            <article className="stat-card">
+              <div className="stat-icon">
+                <SparkIcon
+                  d={
+                    <>
+                      <rect x="2" y="6" width="20" height="13" rx="2" />
+                      <circle cx="12" cy="12.5" r="3" />
+                    </>
+                  }
+                />
+              </div>
+              <span className="stat-value">{orgStats.payslipsThisMonth}</span>
+              <span className="stat-label">Payslips this month</span>
+              <span className="stat-trend">
+                {new Date().toLocaleDateString([], { month: "long", year: "numeric" })}
+              </span>
+            </article>
+          </div>
+        ) : null}
+
         {/* KPI stat cards */}
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
-          <article className="stat-card amber">
+          <article
+            className={`stat-card amber${shiftInfo.tone === "live" ? " status-live" : ""}`}
+            style={isOwner ? { maxWidth: 230 } : undefined}
+          >
             <div className="stat-icon">
               <SparkIcon
                 d={
@@ -140,9 +311,12 @@ export function DashboardPage() {
                 }
               />
             </div>
-            <span className="stat-value">{todayStatus}</span>
             <span className="stat-label">Today's status</span>
-            <span className="stat-trend">{todayStatusLabel}</span>
+            <span className="stat-value status-value">
+              <span className={`status-dot ${shiftInfo.tone}`} aria-hidden="true" />
+              {shiftInfo.value}
+            </span>
+            <span className="stat-trend">{shiftInfo.trend}</span>
           </article>
           {isOwner ? null : (
             <>
@@ -179,7 +353,7 @@ export function DashboardPage() {
         </div>
 
         {/* Quick clock in/out */}
-        <article className="card">
+        <article className="card" style={{ maxWidth: 560 }}>
           <h2>Quick clock in / out</h2>
           <div className="quick-action">
             {onShift ? (
@@ -221,54 +395,12 @@ export function DashboardPage() {
           </div>
         </article>
 
-        {/* My recent leave requests */}
         {isOwner ? null : (
         <>
-        <article className="card table-card">
-          <div className="table-head">
-            <h2>My recent leave requests</h2>
-            <span className="spacer" />
-            <span className="muted" style={{ fontSize: 12 }}>
-              {myLeaves.length} total
-            </span>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Dates</th>
-                  <th style={{ width: 140 }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {myLeaves.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="muted" style={{ padding: "20px 22px" }}>
-                      You haven’t applied for any leave yet.
-                    </td>
-                  </tr>
-                ) : (
-                  myLeaves.slice(0, 5).map((l) => (
-                    <tr key={l.id}>
-                      <td>{LEAVE_TYPE_LABELS[l.leaveType] || l.leaveType}</td>
-                      <td>
-                        {String(l.startDate).slice(0, 10)} → {String(l.endDate).slice(0, 10)}
-                        {l.halfDay ? <span className="row-meta">Half day</span> : null}
-                      </td>
-                      <td>
-                        <span className={`leave-status ${l.status}`}>
-                          {String(l.status).replaceAll("_", " ")}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
-
+        <div
+          className="grid"
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", alignItems: "stretch" }}
+        >
         {/* My leave balance */}
         <article className="card">
           <div className="table-head" style={{ padding: 0, marginBottom: 14 }}>
@@ -283,7 +415,7 @@ export function DashboardPage() {
           ) : (
             <div
               className="grid"
-              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}
+              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
             >
               {balances.items.map((item) => {
                 const allotted = item.allotted || 0;
@@ -311,6 +443,47 @@ export function DashboardPage() {
             </div>
           )}
         </article>
+
+        {/* My recent leave requests */}
+        <article className="card">
+          <div className="table-head" style={{ padding: 0, marginBottom: 4 }}>
+            <h2>My recent leave requests</h2>
+            <span className="spacer" />
+            <span className="muted" style={{ fontSize: 12 }}>
+              {myLeaves.length} total
+            </span>
+          </div>
+          {myLeaves.length === 0 ? (
+            <p className="muted" style={{ padding: "18px 2px 2px" }}>
+              You haven’t applied for any leave yet.
+            </p>
+          ) : (
+            <ul className="leave-list">
+              {myLeaves.slice(0, 5).map((l) => {
+                const days = daysInclusive(l.startDate, l.endDate) * (l.halfDay ? 0.5 : 1);
+                return (
+                  <li key={l.id} className="leave-item">
+                    <LeaveTypeBadge type={l.leaveType} />
+                    <div className="leave-item-main">
+                      <strong>{LEAVE_TYPE_LABELS[l.leaveType] || l.leaveType}</strong>
+                      <span className="leave-item-dates">
+                        {fmtDate(l.startDate)} → {fmtDate(l.endDate)} ·{" "}
+                        {l.halfDay ? "half day" : `${days} ${days === 1 ? "day" : "days"}`}
+                      </span>
+                      {l.status === "rejected" && l.rejectionReason ? (
+                        <span className="leave-item-reject">{l.rejectionReason}</span>
+                      ) : null}
+                    </div>
+                    <span className={`leave-status ${l.status}`}>
+                      {String(l.status).replaceAll("_", " ")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </article>
+        </div>
         </>
         )}
       </div>

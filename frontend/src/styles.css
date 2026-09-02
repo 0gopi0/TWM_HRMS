@@ -357,6 +357,29 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .sidebar-scrim.on { opacity: 1; pointer-events: auto; }
 
+/* ─── Modal ────────────────────────────────────────────────────────────── */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(3, 10, 22, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-card {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+}
+.modal-card h2 { margin: 0; font-size: 1.15rem; }
+.lop-add-btn { width: 26px; min-height: 26px; padding: 0; font-size: 15px; line-height: 1; color: var(--text-muted); }
+.lop-add-btn:hover { color: var(--accent); border-color: var(--accent); }
+
 .page-head {
   display: flex;
   align-items: center;
@@ -492,6 +515,38 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--amber-deep);
 }
 :root[data-theme="dark"] .stat-card.amber .stat-icon { color: var(--amber); }
+
+/* ─── Today's status card (live shift) ───────────────────────────────── */
+.status-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.status-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+.status-dot.live {
+  background: var(--success);
+  animation: status-pulse 2s ease-out infinite;
+}
+.status-dot.done { background: var(--accent); }
+.status-dot.idle { background: var(--text-soft); }
+@keyframes status-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.stat-card.status-live {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--success) 9%, var(--bg-elev)),
+    var(--bg-elev) 60%
+  );
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
 
 /* ─── Quick action card (clock in/out) ───────────────────────────────── */
 .quick-action {
@@ -829,6 +884,137 @@ input:focus, select:focus, textarea:focus {
 }
 :root[data-theme="dark"] .balance-bar > span { background: var(--amber); }
 
+/* ─── My recent leave requests (dashboard list) ───────────────────────── */
+.leave-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.leave-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 10px;
+  margin: 0 -10px;
+  border-radius: var(--radius);
+  transition: background 0.15s ease;
+}
+.leave-item + .leave-item { border-top: 1px solid var(--border); }
+.leave-item:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.leave-type-badge {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+}
+.leave-type-badge.sick {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+.leave-type-badge.casual {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.leave-type-badge.unpaid {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+}
+.leave-item-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.leave-item-main strong { font-size: 14px; }
+.leave-item-dates {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.leave-item-reject {
+  font-size: 12px;
+  color: var(--danger);
+}
+.leave-item > .leave-status { margin-left: auto; flex: none; }
+
+/* ─── Leave page ─────────────────────────────────────────────────────── */
+.leave-balance-who {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.leave-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .leave-grid { grid-template-columns: 1fr; }
+}
+.leave-main {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+  min-width: 0;
+}
+.leave-form { max-width: none; gap: 10px; }
+.leave-form h2 { margin: 0; }
+.leave-form label { gap: 4px; }
+.leave-form-note { margin: -2px 0 0; font-size: 12.5px; }
+.seg {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.on {
+  background: var(--bg-elev);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.half-day {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  grid-auto-flow: column;
+}
+.balance-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.balance-card .leave-type-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
 /* Leave request form (Request leave card) */
 .card-form-grid {
   display: grid;
@@ -850,6 +1036,8 @@ input:focus, select:focus, textarea:focus {
   border-radius: 999px;
   background: var(--bg-muted);
   border: 1px solid var(--border);
+  justify-self: start;
+  width: fit-content;
 }
 .page-tab {
   appearance: none;
@@ -1545,8 +1733,21 @@ input:focus, select:focus, textarea:focus {
 .success { color: var(--success); font-size: 14px; }
 .payroll-grid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.payroll-grid label,
+.payroll-grid input,
+.payroll-grid select,
+.payroll-grid textarea {
+  min-width: 0;
+}
+.payroll-grid input,
+.payroll-grid select,
+.payroll-grid textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .payroll-extras { display: grid; gap: 10px; }
 .payroll-extras-head {

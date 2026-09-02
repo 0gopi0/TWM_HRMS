@@ -1,3 +1,5 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -14,6 +16,10 @@ import { leaveRouter } from "./routes/leave.js";
 import { payrollRouter } from "./routes/payroll.js";
 import { attendanceRouter } from "./routes/attendance.js";
 import { calendarRouter } from "./routes/calendar.js";
+
+// This file is backend/src/app.js — ../../frontend/dist resolves to the
+// repo root's frontend/dist, where `npm run build` puts the built SPA.
+const frontendDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../frontend/dist");
 
 export function createApp() {
   const app = express();
@@ -33,6 +39,10 @@ export function createApp() {
     }),
   );
   app.use(compression());
+  // Static frontend assets stay ahead of the rate limiter and JSON parser —
+  // a page load's JS/CSS requests shouldn't eat into the API's per-minute
+  // budget, and they don't carry a JSON body anyway.
+  if (isProd) app.use(express.static(frontendDist));
   app.use(cookieParser());
   app.use(express.json({ limit: "64kb" }));
   app.use(
@@ -58,6 +68,16 @@ export function createApp() {
   app.use("/api/v1/payroll", payrollRouter);
   app.use("/api/v1/attendance", attendanceRouter);
   app.use("/api/v1/calendar", calendarRouter);
+
+  if (isProd) {
+    // SPA fallback: any unmatched non-API GET resolves to index.html so
+    // client-side routing (react-router) can take over — a hard refresh or
+    // direct link to e.g. /reset-password?token=... must still work.
+    app.get(/^(?!\/(api|health|ready)).*/, (_req, res) => {
+      res.sendFile(resolve(frontendDist, "index.html"));
+    });
+  }
+
   app.use(notFound);
   app.use(errorHandler);
   return app;

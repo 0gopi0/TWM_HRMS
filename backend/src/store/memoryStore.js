@@ -7,12 +7,15 @@ export async function createMemoryStore() {
   const usersByEmail = new Map(seed.users.map((u) => [u.email, u.id]));
   const employees = new Map(seed.employees.map((e) => [e.id, { ...e }]));
   const refreshTokens = new Map();
+  const passwordResetTokens = new Map();
   const leaveApprovals = [];
   const payslips = [];
   const paymentRuns = [];
   const auditLogs = [];
   const salaries = [...seed.salaries];
   const attendance = [];
+  const departments = [...seed.departments];
+  const teams = [...seed.teams];
   const holidays = [...seed.holidays];
   const leaveRequests = [...seed.leaveRequests];
   const leaveEntitlements = [...(seed.leaveEntitlements || [])];
@@ -32,6 +35,26 @@ export async function createMemoryStore() {
     async touchLogin(userId) {
       const u = users.get(userId);
       if (u) u.lastLoginAt = new Date().toISOString();
+    },
+    async updateUserPassword(userId, passwordHash) {
+      const u = users.get(userId);
+      if (u) u.passwordHash = passwordHash;
+    },
+    async updateUserRole(userId, role) {
+      const u = users.get(userId);
+      if (u) u.role = role;
+    },
+    async updateUserEmail(userId, email) {
+      const u = users.get(userId);
+      if (!u || u.email === email) return;
+      if (usersByEmail.has(email)) {
+        const e = new Error("Email is already in use");
+        e.code = "DUPLICATE_EMAIL";
+        throw e;
+      }
+      usersByEmail.delete(u.email);
+      u.email = email;
+      usersByEmail.set(email, userId);
     },
     async saveRefreshToken({ userId, token, expiresAt }) {
       const id = randomUUID();
@@ -54,14 +77,77 @@ export async function createMemoryStore() {
         if (row.userId === userId) row.revokedAt = new Date().toISOString();
       }
     },
+    async createPasswordResetToken({ id, userId, tokenHash, expiresAt }) {
+      for (const row of passwordResetTokens.values()) {
+        if (row.userId === userId && !row.usedAt) passwordResetTokens.delete(row.tokenHash);
+      }
+      passwordResetTokens.set(tokenHash, { id, userId, tokenHash, expiresAt, usedAt: null });
+    },
+    async getPasswordResetToken(tokenHash) {
+      return passwordResetTokens.get(tokenHash) ?? null;
+    },
+    async markPasswordResetTokenUsed(tokenHash) {
+      const row = passwordResetTokens.get(tokenHash);
+      if (row) row.usedAt = new Date().toISOString();
+    },
     async listEmployees() {
-      return [...employees.values()];
+      return [...employees.values()].map((e) => ({
+        ...e,
+        role: users.get(e.userId)?.role,
+        email: users.get(e.userId)?.email,
+      }));
     },
     async getEmployeeById(id) {
       return employees.get(id) ?? null;
     },
     async getEmployeeByUserId(userId) {
       return [...employees.values()].find((e) => e.userId === userId) ?? null;
+    },
+    async listDepartments() {
+      return departments.map((d) => ({ ...d }));
+    },
+    async listTeams() {
+      return teams.map((t) => ({ ...t }));
+    },
+    async createEmployeeWithUser({ user, employee }) {
+      if (usersByEmail.has(user.email)) {
+        const e = new Error("Email is already in use");
+        e.code = "DUPLICATE_EMAIL";
+        throw e;
+      }
+      users.set(user.id, { ...user });
+      usersByEmail.set(user.email, user.id);
+      const row = { ...employee, userId: user.id, employmentStatus: "active" };
+      employees.set(employee.id, row);
+      return row;
+    },
+    async updateEmployee(id, updates) {
+      const emp = employees.get(id);
+      if (!emp) return null;
+      Object.assign(emp, updates);
+      return emp;
+    },
+    async deleteEmployee(id) {
+      const emp = employees.get(id);
+      if (!emp) return false;
+      const referenced = [...employees.values()].some(
+        (e) => e.id !== id && (e.managerId === id || e.leaveApproverId === id),
+      );
+      if (referenced) {
+        const e = new Error("This person is referenced elsewhere (a manager, team lead, or leave approver) and can't be deleted");
+        e.code = "REFERENCED";
+        throw e;
+      }
+      employees.delete(id);
+      if (emp.userId) {
+        for (const [key, row] of refreshTokens) {
+          if (row.userId === emp.userId) refreshTokens.delete(key);
+        }
+        const user = users.get(emp.userId);
+        users.delete(emp.userId);
+        if (user) usersByEmail.delete(user.email);
+      }
+      return true;
     },
     async listLeave() {
       return [...leaveRequests];
@@ -108,6 +194,12 @@ export async function createMemoryStore() {
       }
       payslips.push(row);
       return row;
+    },
+    async deletePayslip(id) {
+      const idx = payslips.findIndex((p) => p.id === id);
+      if (idx === -1) return false;
+      payslips.splice(idx, 1);
+      return true;
     },
     async findPaymentRunByKey(key) {
       return paymentRuns.find((r) => r.idempotencyKey === key) ?? null;

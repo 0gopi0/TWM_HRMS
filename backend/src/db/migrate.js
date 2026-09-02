@@ -63,6 +63,12 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["007_payslip_items"]);
   }
+  const [pwr] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", ["008_password_reset"]);
+  if (pwr.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/008_password_reset.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["008_password_reset"]);
+  }
   await conn.end();
 }
 

@@ -80,6 +80,23 @@ export async function createPayslip({ user, actorEmployeeId, employeeId, period,
   }
 }
 
+export async function deletePayslip({ user, actorEmployeeId, id, requestId, ip }) {
+  if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
+    throw new HttpError(403, "Only Chai and Nagendra can delete payslips");
+  }
+  const store = getStore();
+  const deleted = await store.deletePayslip(id);
+  if (!deleted) throw new HttpError(404, "Payslip not found");
+  await store.writeAudit({
+    actorUserId: user.id,
+    action: "payslip.delete",
+    entity: "payslip",
+    entityId: id,
+    requestId,
+    ip,
+  });
+}
+
 export async function runPayment({ user, actorEmployeeId, idempotencyKey }) {
   if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
     throw new HttpError(403, "Only Chai and Nagendra can run payment");

@@ -42,6 +42,7 @@ export function PayrollPage() {
   const [saving, setSaving] = useState(false);
   const [runningPayment, setRunningPayment] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState("");
   const isHr = can(PERMISSIONS.PAYROLL_WRITE_COMPANY);
   // Narrower than the PAYROLL_WRITE_COMPANY permission: only Chai and
   // Nagendra (accounting) may create payslips or run payment.
@@ -78,6 +79,20 @@ export function PayrollPage() {
 
   function setExtraAt(i, patch) {
     setExtras((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+  }
+
+  async function removePayslip(r) {
+    if (!window.confirm(`Delete the ${r.period} payslip? This can't be undone.`)) return;
+    setError("");
+    setDeletingId(r.id);
+    try {
+      await api(`/api/v1/payroll/payslips/${r.id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingId("");
+    }
   }
 
   async function submit(e) {
@@ -365,14 +380,27 @@ export function PayrollPage() {
                       <td>{r.pfTax ? fmtInr(r.pfTax) : "—"}</td>
                       <td>{r.netAmount != null ? fmtInr(r.netAmount) : "hidden"}</td>
                       <td className="payroll-download-cell">
-                        <button
-                          className="btn btn-ghost payroll-download"
-                          type="button"
-                          title={`Download payslip ${r.period}`}
-                          onClick={() => downloadPayslipPdf(doc).catch((e) => setError(e.message))}
-                        >
-                          ↓ PDF
-                        </button>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                          <button
+                            className="btn btn-ghost payroll-download"
+                            type="button"
+                            title={`Download payslip ${r.period}`}
+                            onClick={() => downloadPayslipPdf(doc).catch((e) => setError(e.message))}
+                          >
+                            ↓ PDF
+                          </button>
+                          {canOperatePayroll ? (
+                            <button
+                              className="btn btn-ghost"
+                              type="button"
+                              title={`Delete payslip ${r.period}`}
+                              disabled={deletingId === r.id}
+                              onClick={() => removePayslip(r)}
+                            >
+                              {deletingId === r.id ? "…" : "Delete"}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   );

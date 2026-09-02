@@ -91,6 +91,10 @@ export function labelForRole(role) {
   return ROLE_LABELS[role] || String(role || "").replaceAll("_", " ");
 }
 
+// Roles HR can hand out when provisioning a new person. Owner, Admin, and
+// Manager are granted by hand outside the create-employee form.
+export const ASSIGNABLE_ROLES = Object.freeze([ROLES.TEAM_MEMBER, ROLES.TEAM_LEADER, ROLES.HR]);
+
 export const HOLIDAY_KINDS = Object.freeze({
   FESTIVAL: "festival",
   OPTIONAL: "optional",

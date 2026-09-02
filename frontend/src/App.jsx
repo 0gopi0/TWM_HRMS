@@ -1,8 +1,10 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { PERMISSIONS, ROLES } from "@twm/shared";
 import { useAuth } from "./auth.jsx";
 import { AppShell } from "./AppShell.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage.jsx";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage.jsx";
 import { DashboardPage } from "./pages/DashboardPage.jsx";
 import { ApprovalsPage } from "./pages/ApprovalsPage.jsx";
 import { EmployeesPage } from "./pages/EmployeesPage.jsx";
@@ -10,6 +12,21 @@ import { LeavePage } from "./pages/LeavePage.jsx";
 import { PayrollPage } from "./pages/PayrollPage.jsx";
 import { OrgPage } from "./pages/OrgPage.jsx";
 import { CalendarPage } from "./pages/CalendarPage.jsx";
+
+// No matching route (typo, stale bookmark, removed page) — a real page
+// instead of react-router-dom silently rendering nothing.
+function NotFoundPage() {
+  return (
+    <div className="page-head" style={{ padding: 24 }}>
+      <div>
+        <h1 className="page-title">Page not found</h1>
+        <p className="muted">
+          <Link to="/">Go back home</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function Guard({ children }) {
   const { user, ready } = useAuth();
@@ -38,6 +55,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/"
         element={
@@ -53,7 +72,9 @@ export function App() {
         <Route path="leave" element={<LeaveRoute />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="payroll" element={<PayrollPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

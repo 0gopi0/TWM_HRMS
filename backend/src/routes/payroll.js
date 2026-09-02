@@ -52,6 +52,26 @@ payrollRouter.post(
   },
 );
 
+payrollRouter.delete(
+  "/payslips/:id",
+  authorize(PERMISSIONS.PAYROLL_WRITE_COMPANY),
+  validate({ params: z.object({ id: z.string().min(1) }) }),
+  async (req, res, next) => {
+    try {
+      await payroll.deletePayslip({
+        user: req.user,
+        actorEmployeeId: req.employee?.id,
+        id: req.params.id,
+        requestId: req.requestId,
+        ip: req.ip,
+      });
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 payrollRouter.post(
   "/payments",
   authorize(PERMISSIONS.PAYROLL_WRITE_COMPANY),
