@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -17,9 +18,12 @@ import { payrollRouter } from "./routes/payroll.js";
 import { attendanceRouter } from "./routes/attendance.js";
 import { calendarRouter } from "./routes/calendar.js";
 
-// This file is backend/src/app.js — ../../frontend/dist resolves to the
-// repo root's frontend/dist, where `npm run build` puts the built SPA.
-const frontendDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../frontend/dist");
+// Supports root dist (where deployment builders like Hostinger expect build output)
+// with fallback to frontend/dist.
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const rootDist = resolve(appRoot, "dist");
+const nestedDist = resolve(appRoot, "frontend/dist");
+const frontendDist = existsSync(rootDist) ? rootDist : nestedDist;
 
 export function createApp() {
   const app = express();

@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: "../dist",
+    emptyOutDir: true,
+  },
   server: {
     // Dual-stack: Node's `localhost` is often [::1] only; IPv4-only bind breaks the other.
     host: "::",
