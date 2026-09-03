@@ -20,17 +20,17 @@ const schema = z.object({
   HOST: z.string().default(() => (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1")),
   PORT: z.coerce.number().int().positive().default(4000),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:5173"),
-  DATABASE_HOST: z.string().default("127.0.0.1"),
+  DATABASE_HOST: z.string().default("localhost"),
   DATABASE_PORT: z.coerce.number().int().default(3306),
-  DATABASE_NAME: z.string().default("twm_hrms"),
-  DATABASE_USER: z.string().default("twm_hrms_app"),
+  DATABASE_NAME: z.string().default("u435860618_hrms"),
+  DATABASE_USER: z.string().default("u435860618_bnghrms"),
   DATABASE_PASSWORD: z.string().default(""),
   USE_MEMORY_STORE: z
     .string()
     .default("false")
     .transform((v) => v === "true" || v === "1"),
-  JWT_ACCESS_SECRET: z.string().min(16),
-  JWT_REFRESH_SECRET: z.string().min(16),
+  JWT_ACCESS_SECRET: z.string().min(16).default("d4e7cefe6b55b00070a59b56812141ab9bb8533d55eb7dc1e8da84f9656649f3"),
+  JWT_REFRESH_SECRET: z.string().min(16).default("35cdc93263a1117f16363c6eac4060453365fb31e296fc1b1f52fc9418b29a0b"),
   ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
   // Hostinger Business mailbox (hPanel > Emails > Mailboxes > Connect apps &
