@@ -27,6 +27,12 @@ export async function api(path, options = {}) {
     }
   }
   if (res.status === 204) return null;
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const err = new Error(res.ok ? "Server returned HTML instead of API response" : "Request failed");
+    err.status = res.status;
+    throw err;
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || "Request failed");

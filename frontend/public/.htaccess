@@ -1,6 +1,12 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Never rewrite API or health endpoints to index.html
+  RewriteCond %{REQUEST_URI} ^/(api|health|ready) [NC]
+  RewriteRule ^ - [L]
+
+  # React Single Page App routing
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
