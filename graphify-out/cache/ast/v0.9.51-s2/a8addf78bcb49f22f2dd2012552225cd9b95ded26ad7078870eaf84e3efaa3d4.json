@@ -1,1 +1,0 @@
-{"nodes": [{"id": "$graphify-root$_backend_sql_003_job_title_sql", "label": "003_job_title.sql", "file_type": "code", "source_file": "backend/sql/003_job_title.sql", "source_location": null}, {"id": "employees", "label": "employees", "file_type": "code", "source_file": "", "source_location": "", "origin_file": "$graphify-root$/backend/sql/003_job_title.sql"}], "edges": []}

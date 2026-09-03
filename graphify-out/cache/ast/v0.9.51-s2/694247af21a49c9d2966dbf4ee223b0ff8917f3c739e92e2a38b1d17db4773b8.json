@@ -1,1 +1,0 @@
-{"nodes": [{"id": "$graphify-root$_scripts_setup_local_mysql_sql", "label": "setup-local-mysql.sql", "file_type": "code", "source_file": "scripts/setup-local-mysql.sql", "source_location": null}], "edges": []}

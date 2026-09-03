@@ -1,10 +1,49 @@
-.env
-*.log
+# Node & Dependencies
 node_modules/
-dist/
-.DS_Store
-frontend/dist
-backend/.env
+backend/node_modules/
+frontend/node_modules/
+.npm-cache/
+.npm/
+.pnpm-store/
+.yarn/
 
-graphify-out/cost.json
-graphify-out/cache/last_query_stamp
+# Build & Bundler outputs
+dist/
+build/
+backend/dist/
+frontend/dist/
+.vite/
+frontend/.vite/
+
+# Environment Variables & Secrets
+.env
+.env.*
+backend/.env
+frontend/.env
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Graphify & AI Tool outputs / caches
+graphify-out/
+.commandcode/
+.gemini/
+
+# Agent scratch / debug test scripts
+.agents/*.mjs
+.agents/*.png
+.agents/*.log
+.agents/scratch/
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
