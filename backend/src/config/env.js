@@ -43,7 +43,10 @@ const schema = z.object({
     .default("true")
     .transform((v) => v === "true" || v === "1"),
   SMTP_USER: z.string().default(""),
-  SMTP_PASS: z.string().default(""),
+  SMTP_PASS: z
+    .string()
+    .default("")
+    .transform((val) => val || process.env.SMTP_PASSWORD || ""),
   SMTP_FROM: z.string().default(""),
   PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(30),
 });
