@@ -1888,6 +1888,53 @@ input:focus, select:focus, textarea:focus {
 }
 .payroll-download:hover { border-color: var(--amber); color: var(--amber); }
 
+/* ─── Activity log ────────────────────────────────────────────────────── */
+.activity-filters-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: end;
+}
+.activity-filters-grid label,
+.activity-filters-grid input,
+.activity-filters-grid select {
+  min-width: 0;
+}
+.activity-clear { justify-self: start; }
+.activity-cat {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  white-space: nowrap;
+}
+.activity-cat--leave {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+}
+.activity-cat--payslip,
+.activity-cat--payment {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+}
+.activity-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
   .login-aurora { animation: none; }

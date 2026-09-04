@@ -3,10 +3,21 @@ import { env } from "./config/env.js";
 import { createApp } from "./app.js";
 import { initStore } from "./store/index.js";
 import { closePool } from "./db/pool.js";
+import { purgeOldActivity } from "./services/activityLogService.js";
 
 const app = createApp();
 const server = createServer(app);
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+let purgeTimer;
+
+function schedulePurge() {
+  purgeOldActivity().catch((err) => console.error("Activity log purge failed:", err));
+  purgeTimer = setInterval(() => {
+    purgeOldActivity().catch((err) => console.error("Activity log purge failed:", err));
+  }, ONE_DAY_MS);
+  purgeTimer.unref();
+}
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
@@ -20,6 +31,9 @@ server.on("error", (err) => {
 
 async function start() {
   await initStore();
+  // Purge activity-log rows past the 2-month retention window once at boot,
+  // then once a day — keeps the table bounded without needing a separate cron.
+  schedulePurge();
   server.listen(env.PORT, env.HOST, () => {
     console.log(`API listening on http://${env.HOST}:${env.PORT}`);
   });

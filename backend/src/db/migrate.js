@@ -75,6 +75,12 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["009_leave_lop"]);
   }
+  const [act] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", ["010_activity_log"]);
+  if (act.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/010_activity_log.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["010_activity_log"]);
+  }
   await conn.end();
 }
 

@@ -63,13 +63,17 @@ const ADMIN = [
   PERMISSIONS.LEAVE_POLICY_WRITE,
   PERMISSIONS.PAYROLL_WRITE_COMPANY,
   PERMISSIONS.USER_PROVISION_COMPANY,
-  PERMISSIONS.AUDIT_READ_COMPANY,
 ];
 
+// The Activity Log (who did what, to whom) is HR + Owner only — same
+// company-wide-people rule as EMPLOYEE_READ_COMPANY above, and for the same
+// reason: the generic "Admin Access" role shouldn't see everyone's HR/payroll
+// actions.
 const HR = [
   ...ADMIN,
   PERMISSIONS.EMPLOYEE_READ_COMPANY,
   PERMISSIONS.EMPLOYEE_WRITE_COMPANY,
+  PERMISSIONS.AUDIT_READ_COMPANY,
 ];
 
 export const ROLE_PERMISSIONS = Object.freeze({

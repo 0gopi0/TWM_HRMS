@@ -3,6 +3,7 @@ import { PAYROLL_OPERATOR_EMPLOYEE_IDS, ROLES } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { stripSalary } from "./scope.js";
+import { resolveActor } from "../utils/activityLog.js";
 
 // Who can see every employee's payslip. Everyone else only ever sees their own.
 const PAYROLL_VIEW_ALL = new Set([ROLES.HR, ROLES.OWNER]);
@@ -65,11 +66,18 @@ export async function createPayslip({ user, actorEmployeeId, employeeId, period,
   };
   try {
     const created = await store.createPayslip(row);
+    const actorEmp = await store.getEmployeeById(actorEmployeeId);
+    const actorName = actorEmp?.legalName || user.email || user.id;
     await store.writeAudit({
       actorUserId: user.id,
+      actorEmployeeId,
+      actorName,
       action: "payslip.create",
       entity: "payslip",
       entityId: created.id,
+      targetEmployeeId: employeeId,
+      targetName: emp.legalName,
+      summary: `${actorName} created a payslip for ${emp.legalName} (${period})`,
       afterJson: { employeeId, period, netAmount: created.netAmount },
       requestId,
       ip,
@@ -86,13 +94,26 @@ export async function deletePayslip({ user, actorEmployeeId, id, requestId, ip }
     throw new HttpError(403, "Only the payroll team can delete payslips");
   }
   const store = getStore();
+  const existing = await store.getPayslip(id);
   const deleted = await store.deletePayslip(id);
   if (!deleted) throw new HttpError(404, "Payslip not found");
+  const [actorEmp, targetEmp] = await Promise.all([
+    store.getEmployeeById(actorEmployeeId),
+    existing ? store.getEmployeeById(existing.employeeId) : null,
+  ]);
+  const actorName = actorEmp?.legalName || user.email || user.id;
+  const targetName = targetEmp?.legalName || "an employee";
   await store.writeAudit({
     actorUserId: user.id,
+    actorEmployeeId,
+    actorName,
     action: "payslip.delete",
     entity: "payslip",
     entityId: id,
+    targetEmployeeId: existing?.employeeId ?? null,
+    targetName,
+    summary: `${actorName} deleted ${targetName}'s payslip${existing ? ` (${existing.period})` : ""}`,
+    beforeJson: existing ? { employeeId: existing.employeeId, period: existing.period, netAmount: existing.netAmount } : null,
     requestId,
     ip,
   });
@@ -105,10 +126,26 @@ export async function runPayment({ user, actorEmployeeId, idempotencyKey }) {
   const store = getStore();
   const existing = await store.findPaymentRunByKey(idempotencyKey);
   if (existing) return existing;
-  return store.createPaymentRun({
+  const created = await store.createPaymentRun({
     id: randomUUID(),
     idempotencyKey,
     status: "completed",
     createdBy: user.id,
   });
+  // The idempotency key is "pay-<period>" by convention (see PayrollPage.jsx);
+  // fall back gracefully if it isn't, rather than failing the payment run.
+  const period = idempotencyKey.startsWith("pay-") ? idempotencyKey.slice(4) : null;
+  const actorEmp = await store.getEmployeeById(actorEmployeeId);
+  const actorName = actorEmp?.legalName || user.email || user.id;
+  await store.writeAudit({
+    actorUserId: user.id,
+    actorEmployeeId,
+    actorName,
+    action: "payment.run",
+    entity: "payment_run",
+    entityId: created.id,
+    summary: `${actorName} ran the payroll payment${period ? ` for ${period}` : ""}`,
+    afterJson: { idempotencyKey, period },
+  });
+  return created;
 }

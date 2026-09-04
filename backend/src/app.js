@@ -17,6 +17,7 @@ import { leaveRouter } from "./routes/leave.js";
 import { payrollRouter } from "./routes/payroll.js";
 import { attendanceRouter } from "./routes/attendance.js";
 import { calendarRouter } from "./routes/calendar.js";
+import { activityRouter } from "./routes/activity.js";
 
 // Supports root dist (where deployment builders like Hostinger expect build output)
 // with fallback to frontend/dist.
@@ -72,6 +73,7 @@ export function createApp() {
   app.use("/api/v1/payroll", payrollRouter);
   app.use("/api/v1/attendance", attendanceRouter);
   app.use("/api/v1/calendar", calendarRouter);
+  app.use("/api/v1/activity", activityRouter);
 
   if (isProd) {
     // SPA fallback: any unmatched non-API GET resolves to index.html so

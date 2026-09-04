@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { LEAVE_ENTITLEMENT_LIST, LEAVE_ENTITLEMENTS, LEAVE_NOTICE_DAYS, LEAVE_TYPE_LABELS, LEAVE_TYPE_LIST, ROLES } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
+import { resolveActor } from "../utils/activityLog.js";
 
 // Leave approval is single-level: the applicant's designated approver
 // (direct manager, or the sales-team override to the owner) makes the
@@ -158,11 +159,17 @@ export async function saveEntitlements({ actor, employeeId, year, casual, paid, 
     { employeeId, year, leaveType: "sick", days: paid },
   ];
   await store.upsertEntitlements(employeeId, year, items);
+  const who = await resolveActor(actor);
   await store.writeAudit({
     actorUserId: actor.id,
+    actorEmployeeId: who.employeeId,
+    actorName: who.name,
     action: "leave.entitlements.update",
     entity: "leave_entitlements",
     entityId: employeeId,
+    targetEmployeeId: employeeId,
+    targetName: employee.legalName,
+    summary: `${who.name} updated ${employee.legalName}'s leave entitlements (casual: ${casual}, sick: ${paid})`,
     beforeJson: before,
     afterJson: { year, casual, paid, unpaid },
   });
@@ -249,11 +256,20 @@ export async function createManagedLeave({ actor, employeeId, leaveType, startDa
     isLop: leaveType === "unpaid",
   };
   const created = await store.createLeave(row);
+  const who = await resolveActor(actor);
+  const summary = row.isLop
+    ? `${who.name} logged an LOP day for ${employee.legalName} (${row.startDate}${row.startDate !== row.endDate ? ` to ${row.endDate}` : ""})`
+    : `${who.name} created a ${LEAVE_TYPE_LABELS[leaveType] || leaveType} request for ${employee.legalName}`;
   await store.writeAudit({
     actorUserId: actor.id,
+    actorEmployeeId: who.employeeId,
+    actorName: who.name,
     action: "leave.manage.create",
     entity: "leave_request",
     entityId: created.id,
+    targetEmployeeId: employeeId,
+    targetName: employee.legalName,
+    summary,
     beforeJson: null,
     afterJson: { employeeId, leaveType, startDate: row.startDate, endDate: row.endDate, status: row.status, halfDay: row.halfDay },
   });
@@ -277,11 +293,21 @@ export async function updateManagedLeave({ actor, leaveId, leaveType, startDate,
     status: status || existing.status,
   };
   const updated = await store.updateLeave(leaveId, next);
+  const [who, targetEmployee] = await Promise.all([
+    resolveActor(actor),
+    store.getEmployeeById(existing.employeeId),
+  ]);
+  const targetName = targetEmployee?.legalName || "an employee";
   await store.writeAudit({
     actorUserId: actor.id,
+    actorEmployeeId: who.employeeId,
+    actorName: who.name,
     action: "leave.manage.update",
     entity: "leave_request",
     entityId: leaveId,
+    targetEmployeeId: existing.employeeId,
+    targetName,
+    summary: `${who.name} updated ${targetName}'s LOP entry (${next.startDate}${next.startDate !== next.endDate ? ` to ${next.endDate}` : ""})`,
     beforeJson: {
       leaveType: existing.leaveType,
       startDate: asYmd(existing.startDate),
@@ -302,11 +328,21 @@ export async function deleteManagedLeave({ actor, leaveId }) {
   // an employee's own submitted (and possibly already-approved) request.
   if (!existing.isLop) throw new HttpError(422, "Only LOP entries can be deleted here");
   await store.deleteLeave(leaveId);
+  const [who, targetEmployee] = await Promise.all([
+    resolveActor(actor),
+    store.getEmployeeById(existing.employeeId),
+  ]);
+  const targetName = targetEmployee?.legalName || "an employee";
   await store.writeAudit({
     actorUserId: actor.id,
+    actorEmployeeId: who.employeeId,
+    actorName: who.name,
     action: "leave.manage.delete",
     entity: "leave_request",
     entityId: leaveId,
+    targetEmployeeId: existing.employeeId,
+    targetName,
+    summary: `${who.name} removed an LOP entry for ${targetName} (${asYmd(existing.startDate)}${asYmd(existing.startDate) !== asYmd(existing.endDate) ? ` to ${asYmd(existing.endDate)}` : ""})`,
     beforeJson: {
       employeeId: existing.employeeId,
       leaveType: existing.leaveType,
@@ -350,11 +386,19 @@ export async function decideLeave({ user, leaveId, decision, comment }) {
   };
   await store.addLeaveApproval(approval);
   const updated = await store.updateLeaveStatus(req.id, nextStatus.status, null);
+  const targetEmployee = await store.getEmployeeById(req.employeeId);
+  const actorName = candidate?.legalName || user.email || user.id;
+  const targetName = targetEmployee?.legalName || "an employee";
   await store.writeAudit({
     actorUserId: user.id,
+    actorEmployeeId: candidate?.id ?? null,
+    actorName,
     action: `leave.${decision}`,
     entity: "leave_request",
     entityId: req.id,
+    targetEmployeeId: req.employeeId,
+    targetName,
+    summary: `${actorName} ${decision} ${targetName}'s ${LEAVE_TYPE_LABELS[req.leaveType] || req.leaveType} request`,
     beforeJson: { status: req.status, approverEmployeeId: req.approverEmployeeId },
     afterJson: { status: nextStatus.status, approverEmployeeId: null },
   });

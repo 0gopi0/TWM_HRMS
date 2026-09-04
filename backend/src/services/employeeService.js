@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { ASSIGNABLE_ROLES } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
+import { resolveActor } from "../utils/activityLog.js";
 
 const EMPLOYEE_NUMBER_PREFIX = "TWM-";
 
@@ -113,11 +114,17 @@ export async function createEmployee({
     throw err;
   }
 
+  const actor = await resolveActor(actorUser);
   await store.writeAudit({
     actorUserId: actorUser.id,
+    actorEmployeeId: actor.employeeId,
+    actorName: actor.name,
     action: "employee.create",
     entity: "employee",
     entityId: created.id,
+    targetEmployeeId: created.id,
+    targetName: employee.legalName,
+    summary: `${actor.name} added ${employee.legalName} as a new employee`,
     afterJson: { email: user.email, legalName: employee.legalName, role, departmentId, teamId },
     requestId,
     ip,
@@ -203,11 +210,23 @@ export async function updateEmployee({
   await store.updateEmployee(id, updates);
   if (roleChanged) await store.updateUserRole(existing.userId, role);
 
+  const actor = await resolveActor(actorUser);
+  const changedBits = [];
+  if (roleChanged) changedBits.push(`role to ${role}`);
+  if (emailChanged) changedBits.push("email");
+  const summary = changedBits.length
+    ? `${actor.name} updated ${updates.legalName}'s ${changedBits.join(" and ")}`
+    : `${actor.name} updated ${updates.legalName}'s profile`;
   await store.writeAudit({
     actorUserId: actorUser.id,
+    actorEmployeeId: actor.employeeId,
+    actorName: actor.name,
     action: "employee.update",
     entity: "employee",
     entityId: id,
+    targetEmployeeId: id,
+    targetName: updates.legalName,
+    summary,
     beforeJson: {
       legalName: existing.legalName,
       email: currentUser?.email,
@@ -243,11 +262,17 @@ export async function deleteEmployee({ actorUser, id, requestId, ip }) {
   }
   if (!deleted) throw new HttpError(404, "Employee not found");
 
+  const actor = await resolveActor(actorUser);
   await store.writeAudit({
     actorUserId: actorUser.id,
+    actorEmployeeId: actor.employeeId,
+    actorName: actor.name,
     action: "employee.delete",
     entity: "employee",
     entityId: id,
+    targetEmployeeId: id,
+    targetName: emp.legalName,
+    summary: `${actor.name} removed ${emp.legalName} from the directory`,
     beforeJson: { employeeNumber: emp.employeeNumber, legalName: emp.legalName },
     requestId,
     ip,

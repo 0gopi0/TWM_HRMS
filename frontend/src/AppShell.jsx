@@ -57,6 +57,11 @@ const Icons = {
       <path d="M6.5 9.5h0M17.5 15.5h0" />
     </svg>
   ),
+  activity: (
+    <svg viewBox="0 0 24 24" width="18" height="18" {...stroke}>
+      <path d="M4 12h4l2-7 4 14 2-7h4" />
+    </svg>
+  ),
 };
 
 /* ─── Navigation definitions ──────────────────────────────────────────── */
@@ -71,6 +76,8 @@ const TOP_NAV = [
   { to: "/org", label: "Org Chart", icon: "org", perm: PERMISSIONS.EMPLOYEE_READ_SELF },
   { to: "/calendar", label: "Calendar", icon: "calendar", perm: PERMISSIONS.LEAVE_READ_SELF },
   { to: "/payroll", label: "Payroll", icon: "payroll", perm: PERMISSIONS.PAYROLL_READ_SELF },
+  // Who did what, to whom — HR/owner only.
+  { to: "/activity", label: "Activity Log", icon: "activity", perm: PERMISSIONS.AUDIT_READ_COMPANY },
 ];
 
 function navAllowed(can, item, isOwner) {

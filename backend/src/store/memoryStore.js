@@ -201,6 +201,9 @@ export async function createMemoryStore() {
       payslips.push(row);
       return row;
     },
+    async getPayslip(id) {
+      return payslips.find((p) => p.id === id) ?? null;
+    },
     async deletePayslip(id) {
       const idx = payslips.findIndex((p) => p.id === id);
       if (idx === -1) return false;
@@ -216,6 +219,35 @@ export async function createMemoryStore() {
     },
     async writeAudit(row) {
       auditLogs.push({ id: randomUUID(), createdAt: new Date().toISOString(), ...row });
+    },
+    async listActivity({ actorEmployeeId, targetEmployeeId, category, from, to, page, pageSize }) {
+      let rows = auditLogs.filter((r) => r.summary != null);
+      if (actorEmployeeId) rows = rows.filter((r) => r.actorEmployeeId === actorEmployeeId);
+      if (targetEmployeeId) rows = rows.filter((r) => r.targetEmployeeId === targetEmployeeId);
+      if (category) rows = rows.filter((r) => String(r.action).startsWith(`${category}.`));
+      if (from) rows = rows.filter((r) => new Date(r.createdAt).getTime() >= from.getTime());
+      if (to) rows = rows.filter((r) => new Date(r.createdAt).getTime() <= to.getTime());
+      rows = [...rows].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      const total = rows.length;
+      const offset = (page - 1) * pageSize;
+      const items = rows.slice(offset, offset + pageSize).map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt,
+        actorEmployeeId: r.actorEmployeeId ?? null,
+        actorName: r.actorName ?? null,
+        targetEmployeeId: r.targetEmployeeId ?? null,
+        targetName: r.targetName ?? null,
+        action: r.action,
+        summary: r.summary,
+      }));
+      return { total, items };
+    },
+    async deleteAuditOlderThan(cutoffDate) {
+      const before = auditLogs.length;
+      for (let i = auditLogs.length - 1; i >= 0; i -= 1) {
+        if (new Date(auditLogs[i].createdAt).getTime() < cutoffDate.getTime()) auditLogs.splice(i, 1);
+      }
+      return before - auditLogs.length;
     },
     async listAttendance(employeeId) {
       return attendance

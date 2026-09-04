@@ -438,6 +438,23 @@ export async function createMysqlStore() {
         throw err;
       }
     },
+    async getPayslip(id) {
+      const [rows] = await pool.query("SELECT * FROM payslips WHERE id = ? LIMIT 1", [id]);
+      const r = rows[0];
+      if (!r) return null;
+      return {
+        id: r.id,
+        employeeId: r.employee_id,
+        period: r.period,
+        currency: r.currency,
+        baseAmount: Number(r.base_amount),
+        grossAmount: Number(r.gross_amount),
+        pfTax: Number(r.pf_tax),
+        netAmount: Number(r.net_amount),
+        extras: r.extras ? (typeof r.extras === "string" ? JSON.parse(r.extras) : r.extras) : [],
+        createdBy: r.created_by,
+      };
+    },
     async deletePayslip(id) {
       const [result] = await pool.query("DELETE FROM payslips WHERE id = ?", [id]);
       return result.affectedRows > 0;
@@ -457,20 +474,78 @@ export async function createMysqlStore() {
     },
     async writeAudit(row) {
       await pool.query(
-        `INSERT INTO audit_logs (id, actor_user_id, action, entity, entity_id, before_json, after_json, ip, request_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO audit_logs
+         (id, actor_user_id, actor_employee_id, actor_name, action, entity, entity_id, target_employee_id, target_name, summary, before_json, after_json, ip, request_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           randomUUID(),
           row.actorUserId,
+          row.actorEmployeeId ?? null,
+          row.actorName ?? null,
           row.action,
           row.entity,
           row.entityId,
+          row.targetEmployeeId ?? null,
+          row.targetName ?? null,
+          row.summary ?? null,
           row.beforeJson ? JSON.stringify(row.beforeJson) : null,
           row.afterJson ? JSON.stringify(row.afterJson) : null,
           row.ip,
           row.requestId,
         ],
       );
+    },
+    // Curated feed for the Activity Log — only rows a service explicitly gave
+    // a `summary` to (see backend/src/utils/activityLog.js) show up here;
+    // routine writes like attendance clock-in/out stay in audit_logs but are
+    // excluded from this HR-facing view.
+    async listActivity({ actorEmployeeId, targetEmployeeId, category, from, to, page, pageSize }) {
+      const clauses = ["summary IS NOT NULL"];
+      const params = [];
+      if (actorEmployeeId) {
+        clauses.push("actor_employee_id = ?");
+        params.push(actorEmployeeId);
+      }
+      if (targetEmployeeId) {
+        clauses.push("target_employee_id = ?");
+        params.push(targetEmployeeId);
+      }
+      if (category) {
+        clauses.push("action LIKE ?");
+        params.push(`${category}.%`);
+      }
+      if (from) {
+        clauses.push("created_at >= ?");
+        params.push(from);
+      }
+      if (to) {
+        clauses.push("created_at <= ?");
+        params.push(to);
+      }
+      const where = `WHERE ${clauses.join(" AND ")}`;
+      const [[{ n }]] = await pool.query(`SELECT COUNT(*) AS n FROM audit_logs ${where}`, params);
+      const offset = (page - 1) * pageSize;
+      const [rows] = await pool.query(
+        `SELECT * FROM audit_logs ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        [...params, pageSize, offset],
+      );
+      return {
+        total: n,
+        items: rows.map((r) => ({
+          id: r.id,
+          createdAt: r.created_at,
+          actorEmployeeId: r.actor_employee_id,
+          actorName: r.actor_name,
+          targetEmployeeId: r.target_employee_id,
+          targetName: r.target_name,
+          action: r.action,
+          summary: r.summary,
+        })),
+      };
+    },
+    async deleteAuditOlderThan(cutoffDate) {
+      const [result] = await pool.query("DELETE FROM audit_logs WHERE created_at < ?", [cutoffDate]);
+      return result.affectedRows;
     },
     async listAttendance(employeeId) {
       const [rows] = await pool.query(

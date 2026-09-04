@@ -12,6 +12,7 @@ import { LeavePage } from "./pages/LeavePage.jsx";
 import { PayrollPage } from "./pages/PayrollPage.jsx";
 import { OrgPage } from "./pages/OrgPage.jsx";
 import { CalendarPage } from "./pages/CalendarPage.jsx";
+import { ActivityLogPage } from "./pages/ActivityLogPage.jsx";
 
 // No matching route (typo, stale bookmark, removed page) — a real page
 // instead of react-router-dom silently rendering nothing.
@@ -51,6 +52,13 @@ function EmployeesRoute() {
   return <EmployeesPage />;
 }
 
+// Activity Log is HR/owner only.
+function ActivityLogRoute() {
+  const { can } = useAuth();
+  if (!can(PERMISSIONS.AUDIT_READ_COMPANY)) return <Navigate to="/" replace />;
+  return <ActivityLogPage />;
+}
+
 export function App() {
   return (
     <Routes>
@@ -72,6 +80,7 @@ export function App() {
         <Route path="leave" element={<LeaveRoute />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="payroll" element={<PayrollPage />} />
+        <Route path="activity" element={<ActivityLogRoute />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
