@@ -19,7 +19,11 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().default(() => (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1")),
   PORT: z.coerce.number().int().positive().default(4000),
-  CLIENT_ORIGIN: z.string().url().default("http://localhost:5173"),
+  CLIENT_ORIGIN: z
+    .string()
+    .url()
+    .transform((v) => v.replace(/\/+$/, ""))
+    .default("http://localhost:5173"),
   DATABASE_HOST: z.string().default("127.0.0.1"),
   DATABASE_PORT: z.coerce.number().int().default(3306),
   DATABASE_NAME: z.string().default("u435860618_hrms"),

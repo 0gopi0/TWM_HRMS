@@ -6,6 +6,11 @@ import { AuthProvider } from "./auth.jsx";
 import { ThemeProvider } from "./theme.jsx";
 import { ToastProvider } from "./toast.jsx";
 import "./styles.css";
+// Clean any duplicate slashes in the URL path (e.g. //reset-password) so React Router matches correctly
+if (window.location.pathname.includes("//")) {
+  const cleanPath = window.location.pathname.replace(/\/+/g, "/");
+  window.history.replaceState(null, "", cleanPath + window.location.search + window.location.hash);
+}
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

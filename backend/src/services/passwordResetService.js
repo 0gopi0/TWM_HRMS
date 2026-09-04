@@ -40,7 +40,8 @@ export async function requestPasswordReset(email) {
   const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
   await store.createPasswordResetToken({ id: randomUUID(), userId: user.id, tokenHash, expiresAt });
 
-  const resetUrl = `${env.CLIENT_ORIGIN}/reset-password?token=${rawToken}`;
+  const origin = (env.CLIENT_ORIGIN || "").replace(/\/+$/, "");
+  const resetUrl = `${origin}/reset-password?token=${rawToken}`;
   await sendMail({
     to: user.email,
     subject: "Reset your TWM HRMS password",
