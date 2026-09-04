@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
+import { isOnFullDayLeave } from "./leaveService.js";
 
 function mapEntry(row) {
   if (!row) return null;
@@ -41,6 +42,10 @@ export async function clockIn(employee) {
   const status = await getAttendanceStatus(employee);
   if (status.completeForToday || status.today.length > 0) {
     throw new HttpError(409, "Already clocked for today");
+  }
+  const today = new Date().toLocaleDateString("en-CA");
+  if (await isOnFullDayLeave(employee.id, today)) {
+    throw new HttpError(409, "You're on approved leave today — clock in is disabled");
   }
   const row = {
     id: randomUUID(),

@@ -533,7 +533,7 @@ export function EmployeesPage() {
                             <button
                               className="icon-btn lop-add-btn"
                               type="button"
-                              title={`Log unpaid leave for ${e.legalName}`}
+                              title={`Log LOP for ${e.legalName}`}
                               onClick={() => openLopModal(e)}
                             >
                               +
@@ -580,9 +580,10 @@ export function EmployeesPage() {
             onClick={(e) => e.stopPropagation()}
             onSubmit={submitLop}
           >
-            <h2>Log unpaid leave — {byId[lopFor]?.legalName}</h2>
+            <h2>Log LOP — {byId[lopFor]?.legalName}</h2>
             <p className="muted" style={{ marginTop: -8 }}>
-              Recorded as approved unpaid leave, same as if they'd applied and been approved.
+              Recorded as an approved LOP (loss of pay) day, and deducted from this employee's next payslip for
+              the period it falls in.
             </p>
             {lopError ? <p className="error">{lopError}</p> : null}
             <div className="date-row">
@@ -627,12 +628,12 @@ export function EmployeesPage() {
               <input
                 value={lopForm.reason}
                 onChange={(e) => setLopForm((f) => ({ ...f, reason: e.target.value }))}
-                placeholder="Optional"
+                placeholder="e.g. No-show, unapproved absence — shown to the employee"
               />
             </label>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-primary" type="submit" disabled={lopSaving}>
-                {lopSaving ? "Saving…" : "Log unpaid leave"}
+                {lopSaving ? "Saving…" : "Log LOP"}
               </button>
               <button className="btn btn-ghost" type="button" onClick={closeLopModal} disabled={lopSaving}>
                 Cancel

@@ -53,10 +53,11 @@ const MANAGER = [
   PERMISSIONS.LEAVE_APPROVE_DEPARTMENT,
 ];
 
+// Company-wide People tab access (viewing and editing every employee's
+// record) is reserved for HR — not the generic "Admin Access" role — plus
+// the owner (who holds every permission via ALL below).
 const ADMIN = [
   ...MANAGER,
-  PERMISSIONS.EMPLOYEE_READ_COMPANY,
-  PERMISSIONS.EMPLOYEE_WRITE_COMPANY,
   PERMISSIONS.LEAVE_READ_COMPANY,
   PERMISSIONS.LEAVE_APPROVE_COMPANY,
   PERMISSIONS.LEAVE_POLICY_WRITE,
@@ -65,13 +66,19 @@ const ADMIN = [
   PERMISSIONS.AUDIT_READ_COMPANY,
 ];
 
+const HR = [
+  ...ADMIN,
+  PERMISSIONS.EMPLOYEE_READ_COMPANY,
+  PERMISSIONS.EMPLOYEE_WRITE_COMPANY,
+];
+
 export const ROLE_PERMISSIONS = Object.freeze({
   [ROLES.OWNER]: ALL,
   [ROLES.ADMIN]: ADMIN,
   [ROLES.TEAM_MEMBER]: MEMBER,
   [ROLES.TEAM_LEADER]: LEADER,
   [ROLES.MANAGER]: MANAGER,
-  [ROLES.HR]: ADMIN,
+  [ROLES.HR]: HR,
 });
 
 export function permissionsForRole(role) {
@@ -142,7 +149,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   {
     key: "manoj",
     name: "Manoj",
-    email: "manoj@twm.local",
+    email: "manoj@thewebsitemakers.in",
     jobTitle: "CMO & Co-Founder",
     role: ROLES.OWNER,
     roleLabel: "Owner",
@@ -273,7 +280,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   {
     key: "chai",
     name: "Chai",
-    email: "chai@twm.local",
+    email: "chaitali@hiretick.in",
     jobTitle: "CEO - Hirect",
     role: ROLES.HR,
     roleLabel: "HR Admin Access",

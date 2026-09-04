@@ -1,4 +1,13 @@
 // Small shared UI bits used across pages (dashboard, leave).
+import { LEAVE_TYPE_LABELS } from "@twm/shared";
+
+// Admin-logged LOP entries (leaveType "unpaid" + isLop) display as "LOP"
+// instead of the generic "Unpaid leave" label, so they read as loss-of-pay
+// records rather than something the employee applied for themselves.
+export function leaveTypeLabel(row) {
+  if (row?.isLop) return "LOP";
+  return LEAVE_TYPE_LABELS[row?.leaveType] || row?.leaveType;
+}
 
 export function SparkIcon({ d, size = 18 }) {
   return (

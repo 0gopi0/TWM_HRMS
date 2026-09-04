@@ -935,6 +935,10 @@ input:focus, select:focus, textarea:focus {
   font-size: 12px;
   color: var(--danger);
 }
+.leave-item-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .leave-item > .leave-status { margin-left: auto; flex: none; }
 
 /* ─── Leave page ─────────────────────────────────────────────────────── */

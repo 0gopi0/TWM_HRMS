@@ -65,7 +65,8 @@ const TOP_NAV = [
   // The top of the org (owner) doesn't request leave, so hide the Leave nav for them.
   { to: "/leave", label: "Leave", icon: "leave", perm: PERMISSIONS.LEAVE_READ_SELF, hideForOwner: true },
   { to: "/approvals", label: "Approvals", icon: "approvals", perm: PERMISSIONS.LEAVE_APPROVE_TEAM },
-  // People (everyone's clock in/out) is HR/admin/owner only.
+  // People (everyone's directory, attendance, and LOP) is HR/owner only —
+  // not the generic Admin Access role.
   { to: "/employees", label: "People", icon: "people", perm: PERMISSIONS.EMPLOYEE_READ_COMPANY },
   { to: "/org", label: "Org Chart", icon: "org", perm: PERMISSIONS.EMPLOYEE_READ_SELF },
   { to: "/calendar", label: "Calendar", icon: "calendar", perm: PERMISSIONS.LEAVE_READ_SELF },

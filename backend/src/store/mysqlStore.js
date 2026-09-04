@@ -310,6 +310,7 @@ export async function createMysqlStore() {
         approverEmployeeId: r.approver_employee_id,
         halfDay: Boolean(r.half_day),
         reason: r.reason,
+        isLop: Boolean(r.is_lop),
         createdAt: r.created_at,
       }));
     },
@@ -327,13 +328,14 @@ export async function createMysqlStore() {
         approverEmployeeId: r.approver_employee_id,
         halfDay: Boolean(r.half_day),
         reason: r.reason,
+        isLop: Boolean(r.is_lop),
       };
     },
     async createLeave(row) {
       await pool.query(
-        `INSERT INTO leave_requests (id, employee_id, leave_type, start_date, end_date, status, approver_employee_id, half_day, reason)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [row.id, row.employeeId, row.leaveType, row.startDate, row.endDate, row.status, row.approverEmployeeId ?? null, row.halfDay ? 1 : 0, row.reason],
+        `INSERT INTO leave_requests (id, employee_id, leave_type, start_date, end_date, status, approver_employee_id, half_day, reason, is_lop)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [row.id, row.employeeId, row.leaveType, row.startDate, row.endDate, row.status, row.approverEmployeeId ?? null, row.halfDay ? 1 : 0, row.reason, row.isLop ? 1 : 0],
       );
       return row;
     },

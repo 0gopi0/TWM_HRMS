@@ -69,6 +69,12 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["008_password_reset"]);
   }
+  const [lop] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", ["009_leave_lop"]);
+  if (lop.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/009_leave_lop.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["009_leave_lop"]);
+  }
   await conn.end();
 }
 

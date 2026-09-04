@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { LEAVE_NOTICE_DAYS, LEAVE_TYPE_LABELS, LEAVE_TYPE_LIST, PERMISSIONS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
-import { LeaveTypeBadge, fmtDate } from "../ui.jsx";
+import { LeaveTypeBadge, fmtDate, leaveTypeLabel } from "../ui.jsx";
 
 function pad(n) {
   return String(n).padStart(2, "0");
@@ -207,11 +207,14 @@ export function LeavePage() {
                     <li key={row.id} className="leave-item">
                       <LeaveTypeBadge type={row.leaveType} />
                       <div className="leave-item-main">
-                        <strong>{LEAVE_TYPE_LABELS[row.leaveType] || row.leaveType}</strong>
+                        <strong>{leaveTypeLabel(row)}</strong>
                         <span className="leave-item-dates">
                           {fmtDate(row.startDate)} → {fmtDate(row.endDate)} ·{" "}
                           {row.halfDay ? "half day" : `${days} ${days === 1 ? "day" : "days"}`}
                         </span>
+                        {row.isLop && row.reason ? (
+                          <span className="leave-item-note">Reason: {row.reason}</span>
+                        ) : null}
                         {row.status === "rejected" && row.rejectionReason ? (
                           <span className="leave-item-reject">Reason: {row.rejectionReason}</span>
                         ) : null}

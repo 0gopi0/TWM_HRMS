@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LEAVE_TYPE_LABELS, ROLES } from "@twm/shared";
 import { useAuth } from "../auth.jsx";
 import { api } from "../api.js";
-import { SparkIcon, LeaveTypeBadge, fmtDate } from "../ui.jsx";
+import { SparkIcon, LeaveTypeBadge, fmtDate, leaveTypeLabel } from "../ui.jsx";
 
 function formatTime(value) {
   if (!value) return "—";
@@ -111,6 +111,15 @@ export function DashboardPage() {
   const myId = user?.employee?.id;
 
   const myLeaves = useMemo(() => leaves.filter((l) => l.employeeId === myId), [leaves, myId]);
+
+  // Full-day approved leave blocks clock-in; a half-day leave (of any type —
+  // sick, casual, or unpaid) still allows clocking in/out for the rest of the day.
+  const onLeaveToday = useMemo(() => {
+    const today = new Date().toLocaleDateString("en-CA");
+    return myLeaves.some(
+      (l) => l.status === "approved" && !l.halfDay && l.startDate <= today && l.endDate >= today,
+    );
+  }, [myLeaves]);
   const leavesThisMonth = useMemo(
     () =>
       myLeaves
@@ -212,6 +221,58 @@ export function DashboardPage() {
       {error ? <p className="error" style={{ marginBottom: 12 }}>{error}</p> : null}
 
       <div className="dashboard-stack">
+        {/* Quick clock in/out — kept at the top so it's the first thing anyone acts on */}
+        <article className="card" style={{ maxWidth: 560 }}>
+          <h2>Quick clock in / out</h2>
+          <div className="quick-action">
+            {onShift ? (
+              <button
+                className="btn btn-danger"
+                type="button"
+                disabled={busy}
+                onClick={() => punch("/api/v1/attendance/clock-out")}
+              >
+                {busy ? "…" : "Clock out"}
+              </button>
+            ) : doneToday ? (
+              <button className="btn" type="button" disabled>
+                Day complete
+              </button>
+            ) : onLeaveToday ? (
+              <button className="btn" type="button" disabled title="You're on approved leave today">
+                On leave today
+              </button>
+            ) : (
+              <button
+                className="btn btn-accent"
+                type="button"
+                disabled={busy}
+                onClick={() => punch("/api/v1/attendance/clock-in")}
+              >
+                {busy ? "…" : "Clock in"}
+              </button>
+            )}
+            <div className="qa-time">
+              <span>In</span>
+              <strong>{formatTime(attendance?.clockInAt)}</strong>
+            </div>
+            <div className="qa-time">
+              <span>Out</span>
+              <strong>{formatTime(attendance?.clockOutAt)}</strong>
+            </div>
+            {attendance?.today?.length > 0 ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                {attendance.today.length} {attendance.today.length === 1 ? "entry" : "entries"} today
+              </span>
+            ) : null}
+          </div>
+          {onLeaveToday && !doneToday ? (
+            <p className="muted" style={{ fontSize: 12, margin: "10px 0 0" }}>
+              You're on approved leave today, so clock in is disabled. Half-day leave still allows clocking in/out.
+            </p>
+          ) : null}
+        </article>
+
         {/* Org-wide stats — owner / HR only */}
         {orgStats ? (
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
@@ -352,49 +413,6 @@ export function DashboardPage() {
           )}
         </div>
 
-        {/* Quick clock in/out */}
-        <article className="card" style={{ maxWidth: 560 }}>
-          <h2>Quick clock in / out</h2>
-          <div className="quick-action">
-            {onShift ? (
-              <button
-                className="btn btn-danger"
-                type="button"
-                disabled={busy}
-                onClick={() => punch("/api/v1/attendance/clock-out")}
-              >
-                {busy ? "…" : "Clock out"}
-              </button>
-            ) : doneToday ? (
-              <button className="btn" type="button" disabled>
-                Day complete
-              </button>
-            ) : (
-              <button
-                className="btn btn-accent"
-                type="button"
-                disabled={busy}
-                onClick={() => punch("/api/v1/attendance/clock-in")}
-              >
-                {busy ? "…" : "Clock in"}
-              </button>
-            )}
-            <div className="qa-time">
-              <span>In</span>
-              <strong>{formatTime(attendance?.clockInAt)}</strong>
-            </div>
-            <div className="qa-time">
-              <span>Out</span>
-              <strong>{formatTime(attendance?.clockOutAt)}</strong>
-            </div>
-            {attendance?.today?.length > 0 ? (
-              <span className="muted" style={{ fontSize: 12 }}>
-                {attendance.today.length} {attendance.today.length === 1 ? "entry" : "entries"} today
-              </span>
-            ) : null}
-          </div>
-        </article>
-
         {isOwner ? null : (
         <>
         <div
@@ -465,11 +483,14 @@ export function DashboardPage() {
                   <li key={l.id} className="leave-item">
                     <LeaveTypeBadge type={l.leaveType} />
                     <div className="leave-item-main">
-                      <strong>{LEAVE_TYPE_LABELS[l.leaveType] || l.leaveType}</strong>
+                      <strong>{leaveTypeLabel(l)}</strong>
                       <span className="leave-item-dates">
                         {fmtDate(l.startDate)} → {fmtDate(l.endDate)} ·{" "}
                         {l.halfDay ? "half day" : `${days} ${days === 1 ? "day" : "days"}`}
                       </span>
+                      {l.isLop && l.reason ? (
+                        <span className="leave-item-note">Reason: {l.reason}</span>
+                      ) : null}
                       {l.status === "rejected" && l.rejectionReason ? (
                         <span className="leave-item-reject">{l.rejectionReason}</span>
                       ) : null}

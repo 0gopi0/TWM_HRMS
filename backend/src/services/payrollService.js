@@ -21,12 +21,13 @@ function round2(n) {
 export function computePay({ baseSalary, extras }) {
   const baseAmount = round2(baseSalary);
   const lines = (extras ?? [])
-    .filter((line) => round2(line.amount) > 0)
+    .filter((line) => round2(line.amount) !== 0)
     .map((line) => ({
       label: String(line.label).trim().slice(0, 120),
       amount: round2(line.amount),
     }));
-  const grossAmount = round2(baseAmount + lines.reduce((sum, l) => sum + l.amount, 0));
+  // Deduction lines (e.g. LOP) can't take gross below zero.
+  const grossAmount = Math.max(0, round2(baseAmount + lines.reduce((sum, l) => sum + l.amount, 0)));
   const pfTax = grossAmount >= PF_TAX_THRESHOLD ? PF_TAX_AMOUNT : 0;
   const netAmount = round2(grossAmount - pfTax);
   return { baseAmount, extras: lines, grossAmount, pfTax, netAmount };

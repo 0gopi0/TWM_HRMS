@@ -28,7 +28,14 @@ payrollRouter.post(
       period: z.string().regex(/^\d{4}-\d{2}$/),
       baseSalary: z.number().positive().max(10_000_000),
       extras: z
-        .array(z.object({ label: z.string().trim().min(1).max(120), amount: z.number().min(0).max(10_000_000) }))
+        .array(
+          z.object({
+            label: z.string().trim().min(1).max(120),
+            // Negative amounts are deductions (e.g. an LOP line computed
+            // from approved unpaid leave for the period).
+            amount: z.number().min(-10_000_000).max(10_000_000),
+          }),
+        )
         .max(50)
         .default([]),
     }),

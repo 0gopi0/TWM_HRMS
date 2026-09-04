@@ -29,10 +29,39 @@ function newEmptyExtra() {
   return { label: "", amount: "" };
 }
 
+function daysInMonth(period) {
+  const [y, m] = String(period).split("-").map(Number);
+  if (!y || !m) return 30;
+  return new Date(y, m, 0).getDate();
+}
+
+// Approved unpaid-leave (LOP) days for `employeeId` that overlap `period`
+// (YYYY-MM) — same "full days, or 0.5 for a half-day single-day leave" rule
+// used for leave balances, whatever the source (self-applied or admin-logged).
+function lopDaysInPeriod(leaveRows, employeeId, period) {
+  const [y, m] = String(period).split("-").map(Number);
+  if (!y || !m) return 0;
+  const periodStart = new Date(y, m - 1, 1);
+  const periodEnd = new Date(y, m, 0);
+  let total = 0;
+  for (const row of leaveRows) {
+    if (row.employeeId !== employeeId) continue;
+    if (row.leaveType !== "unpaid" || row.status !== "approved") continue;
+    const start = new Date(`${row.startDate}T00:00:00`);
+    const end = new Date(`${row.endDate}T00:00:00`);
+    const s = start < periodStart ? periodStart : start;
+    const e = end > periodEnd ? periodEnd : end;
+    if (e < s) continue;
+    total += row.halfDay ? 0.5 : Math.round((e - s) / 86400000) + 1;
+  }
+  return total;
+}
+
 export function PayrollPage() {
   const { can, user } = useAuth();
   const [rows, setRows] = useState([]);
   const [people, setPeople] = useState([]);
+  const [leaveRows, setLeaveRows] = useState([]);
   const [employeeId, setEmployeeId] = useState("");
   const [period, setPeriod] = useState(currentPeriod());
   const [baseSalary, setBaseSalary] = useState("");
@@ -57,6 +86,10 @@ export function PayrollPage() {
       const selectable = emps.data.filter((p) => !EXCLUDED_FROM_PAYROLL.has(p.id));
       if (!employeeId && selectable[0]) setEmployeeId(selectable[0].id);
     }
+    if (canOperatePayroll) {
+      const leave = await api("/api/v1/leave?pageSize=500");
+      setLeaveRows(leave.data || []);
+    }
   }
 
   useEffect(() => {
@@ -67,15 +100,35 @@ export function PayrollPage() {
   }, []);
 
   const base = round2(baseSalary || 0);
+
+  const lopDays = useMemo(
+    () => (employeeId && period ? lopDaysInPeriod(leaveRows, employeeId, period) : 0),
+    [leaveRows, employeeId, period],
+  );
+  // Per-day rate off the base salary alone, capped so it can never exceed
+  // the base — a month entirely on unpaid leave zeroes it out, not less.
+  const lopDeduction = useMemo(() => {
+    if (!lopDays || base <= 0) return 0;
+    const perDay = round2(base / daysInMonth(period));
+    return Math.min(base, round2(perDay * lopDays));
+  }, [lopDays, base, period]);
+
   const total = useMemo(() => {
     const lines = extras.map((x) => ({
       label: x.label.trim(),
       amount: round2(x.amount || 0),
     }));
-    const gross = round2(base + lines.reduce((s, l) => s + l.amount, 0));
+    if (lopDeduction > 0) {
+      lines.push({
+        label: `LOP deduction (${lopDays} day${lopDays === 1 ? "" : "s"} unpaid leave)`,
+        amount: -lopDeduction,
+        isLop: true,
+      });
+    }
+    const gross = Math.max(0, round2(base + lines.reduce((s, l) => s + l.amount, 0)));
     const pf = gross >= PF_TAX_THRESHOLD ? PF_TAX_AMOUNT : 0;
     return { lines, gross, pf, net: round2(gross - pf) };
-  }, [base, extras]);
+  }, [base, extras, lopDeduction, lopDays]);
 
   function setExtraAt(i, patch) {
     setExtras((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
@@ -111,8 +164,9 @@ export function PayrollPage() {
       setError("Enter a base salary greater than 0.");
       return;
     }
-    const lines = total.lines.filter((l) => l.label && l.amount > 0);
+    const lines = total.lines.filter((l) => l.label && l.amount !== 0);
     for (const l of lines) {
+      if (l.isLop) continue; // computed from approved LOP days, not user-entered
       if (!Number.isFinite(l.amount) || l.amount < 0) {
         setError(`"${l.label}" has an invalid amount.`);
         return;
@@ -126,7 +180,7 @@ export function PayrollPage() {
           employeeId,
           period,
           baseSalary: base,
-          extras: lines,
+          extras: lines.map(({ label, amount }) => ({ label, amount })),
         }),
       });
       setNotice("Payslip created.");
@@ -250,11 +304,13 @@ export function PayrollPage() {
               <span>{fmtInr(base)}</span>
             </div>
             {total.lines
-              .filter((l) => l.label && l.amount > 0)
+              .filter((l) => l.label && l.amount !== 0)
               .map((l, i) => (
                 <div className="payroll-total-row" key={i}>
                   <span>{l.label}</span>
-                  <span>{fmtInr(l.amount)}</span>
+                  <span className={l.amount < 0 ? "pf-minus" : undefined}>
+                    {l.amount < 0 ? `− ${fmtInr(Math.abs(l.amount))}` : fmtInr(l.amount)}
+                  </span>
                 </div>
               ))}
             <div className="payroll-total-row payroll-total-row--gross">
@@ -374,7 +430,10 @@ export function PayrollPage() {
                       <td>{r.baseAmount != null ? fmtInr(r.baseAmount) : "hidden"}</td>
                       <td>
                         {r.extras != null && r.extras.length
-                          ? `${extraCount} item${extraCount > 1 ? "s" : ""} (+${fmtInr(r.grossAmount - r.baseAmount)})`
+                          ? (() => {
+                              const diff = round2(r.grossAmount - r.baseAmount);
+                              return `${extraCount} item${extraCount > 1 ? "s" : ""} (${diff < 0 ? "−" : "+"}${fmtInr(Math.abs(diff))})`;
+                            })()
                           : "—"}
                       </td>
                       <td>{r.pfTax ? fmtInr(r.pfTax) : "—"}</td>

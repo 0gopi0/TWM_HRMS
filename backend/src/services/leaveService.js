@@ -18,6 +18,21 @@ export function asYmd(value) {
   return String(value).slice(0, 10);
 }
 
+// Whether an employee has an approved, full-day leave covering `ymd` — used
+// to block clock-in. A half-day leave still allows clocking in/out for the
+// rest of the day, regardless of leave type (sick, casual, or unpaid).
+export async function isOnFullDayLeave(employeeId, ymd) {
+  const rows = await getStore().listLeave();
+  return rows.some(
+    (row) =>
+      row.employeeId === employeeId &&
+      row.status === "approved" &&
+      !row.halfDay &&
+      asYmd(row.startDate) <= ymd &&
+      asYmd(row.endDate) >= ymd,
+  );
+}
+
 function daysUntil(startDate) {
   const start = new Date(`${asYmd(startDate)}T00:00:00`);
   const today = new Date();
@@ -228,6 +243,10 @@ export async function createManagedLeave({ actor, employeeId, leaveType, startDa
     reason: reason || null,
     halfDay: Boolean(halfDay),
     status: status || "approved",
+    // Only unpaid leave logged through this admin-only route counts as LOP —
+    // it's how HR records a day someone didn't show up, distinct from an
+    // employee applying for unpaid leave themselves.
+    isLop: leaveType === "unpaid",
   };
   const created = await store.createLeave(row);
   await store.writeAudit({
