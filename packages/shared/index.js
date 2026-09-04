@@ -139,7 +139,7 @@ export const DEMO_PASSWORD = "LocalDev!23";
 // Payslip creation and running payment are restricted to these two people
 // specifically (accounting), not the whole HR/Admin/Owner role — narrower
 // than PERMISSIONS.PAYROLL_WRITE_COMPANY, which still governs read access.
-export const PAYROLL_OPERATOR_EMPLOYEE_IDS = Object.freeze(["emp-chai", "emp-nagendra"]);
+export const PAYROLL_OPERATOR_EMPLOYEE_IDS = Object.freeze(["emp-chai", "emp-nagendra", "emp-priya", "emp-manoj"]);
 
 // Full org chart. managerId builds the reporting tree; the leave approval
 // chain follows managerId up to the top (Manoj, the owner).

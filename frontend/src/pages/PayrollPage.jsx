@@ -66,6 +66,7 @@ export function PayrollPage() {
   const [period, setPeriod] = useState(currentPeriod());
   const [baseSalary, setBaseSalary] = useState("");
   const [extras, setExtras] = useState([]);
+  const [deductions, setDeductions] = useState([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -73,8 +74,8 @@ export function PayrollPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState("");
   const isHr = can(PERMISSIONS.PAYROLL_WRITE_COMPANY);
-  // Narrower than the PAYROLL_WRITE_COMPANY permission: only Chai and
-  // Nagendra (accounting) may create payslips or run payment.
+  // Narrower than the PAYROLL_WRITE_COMPANY permission: only the payroll
+  // team (Chai, Nagendra, Priya, Manoj) may create payslips or run payment.
   const canOperatePayroll = PAYROLL_OPERATORS.has(user?.employee?.id);
 
   async function load() {
@@ -114,24 +115,36 @@ export function PayrollPage() {
   }, [lopDays, base, period]);
 
   const total = useMemo(() => {
-    const lines = extras.map((x) => ({
+    const earningsLines = extras.map((x) => ({
       label: x.label.trim(),
       amount: round2(x.amount || 0),
     }));
+    const deductionLines = deductions.map((x) => ({
+      label: x.label.trim(),
+      amount: -round2(x.amount || 0),
+      isDeduction: true,
+    }));
     if (lopDeduction > 0) {
-      lines.push({
+      deductionLines.push({
         label: `LOP deduction (${lopDays} day${lopDays === 1 ? "" : "s"} unpaid leave)`,
         amount: -lopDeduction,
         isLop: true,
       });
     }
+    const lines = [...earningsLines, ...deductionLines];
+    const earningsTotal = round2(base + earningsLines.reduce((s, l) => s + l.amount, 0));
+    const deductionsTotal = round2(deductionLines.reduce((s, l) => s - l.amount, 0));
     const gross = Math.max(0, round2(base + lines.reduce((s, l) => s + l.amount, 0)));
     const pf = gross >= PF_TAX_THRESHOLD ? PF_TAX_AMOUNT : 0;
-    return { lines, gross, pf, net: round2(gross - pf) };
-  }, [base, extras, lopDeduction, lopDays]);
+    return { lines, earningsLines, deductionLines, earningsTotal, deductionsTotal, gross, pf, net: round2(gross - pf) };
+  }, [base, extras, deductions, lopDeduction, lopDays]);
 
   function setExtraAt(i, patch) {
     setExtras((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+  }
+
+  function setDeductionAt(i, patch) {
+    setDeductions((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   }
 
   async function removePayslip(r) {
@@ -167,6 +180,13 @@ export function PayrollPage() {
     const lines = total.lines.filter((l) => l.label && l.amount !== 0);
     for (const l of lines) {
       if (l.isLop) continue; // computed from approved LOP days, not user-entered
+      if (l.isDeduction) {
+        if (!Number.isFinite(l.amount) || l.amount > 0) {
+          setError(`"${l.label}" has an invalid deduction amount.`);
+          return;
+        }
+        continue;
+      }
       if (!Number.isFinite(l.amount) || l.amount < 0) {
         setError(`"${l.label}" has an invalid amount.`);
         return;
@@ -186,6 +206,7 @@ export function PayrollPage() {
       setNotice("Payslip created.");
       setBaseSalary("");
       setExtras([]);
+      setDeductions([]);
       await load();
     } catch (err) {
       setError(err.message);
@@ -203,7 +224,7 @@ export function PayrollPage() {
             {canOperatePayroll
               ? "Add a monthly payslip: base salary plus any extras like travel or bonuses."
               : isHr
-                ? "Payslip creation and payment runs are handled by Chai and Nagendra."
+                ? "Payslip creation and payment runs are handled by the payroll team."
                 : "Your payslips only."}
           </p>
         </div>
@@ -298,31 +319,85 @@ export function PayrollPage() {
             </button>
           </div>
 
+          <div className="payroll-extras">
+            <div className="payroll-extras-head">
+              <span>Additional deductions</span>
+              <span className="muted">PF, advances, etc. — enter the amount to deduct</span>
+            </div>
+            {deductions.length === 0 ? (
+              <p className="muted payroll-extras-empty">No manual deductions yet — add one below.</p>
+            ) : (
+              <ul className="payroll-extra-rows">
+                {deductions.map((x, i) => (
+                  <li key={i} className="payroll-extra-row">
+                    <input
+                      type="text"
+                      placeholder="e.g. PF"
+                      value={x.label}
+                      maxLength={120}
+                      onChange={(e) => setDeductionAt(i, { label: e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Amount"
+                      value={x.amount}
+                      onChange={(e) => setDeductionAt(i, { amount: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      className="icon-btn payroll-extra-remove"
+                      aria-label="Remove deduction"
+                      onClick={() => setDeductions((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setDeductions((prev) => [...prev, newEmptyExtra()])}
+            >
+              + Add deduction
+            </button>
+          </div>
+
           <div className="payroll-totals">
             <div className="payroll-total-row">
               <span>Base salary</span>
               <span>{fmtInr(base)}</span>
             </div>
-            {total.lines
+            {total.earningsLines
               .filter((l) => l.label && l.amount !== 0)
               .map((l, i) => (
                 <div className="payroll-total-row" key={i}>
                   <span>{l.label}</span>
-                  <span className={l.amount < 0 ? "pf-minus" : undefined}>
-                    {l.amount < 0 ? `− ${fmtInr(Math.abs(l.amount))}` : fmtInr(l.amount)}
-                  </span>
+                  <span>{fmtInr(l.amount)}</span>
                 </div>
               ))}
             <div className="payroll-total-row payroll-total-row--gross">
-              <span>Gross</span>
-              <span>{fmtInr(total.gross)}</span>
+              <span>Gross earnings</span>
+              <span>{fmtInr(total.earningsTotal)}</span>
             </div>
+            {total.deductionLines
+              .filter((l) => l.label && l.amount !== 0)
+              .map((l, i) => (
+                <div className="payroll-total-row" key={i}>
+                  <span>{l.label}</span>
+                  <span className="pf-minus">− {fmtInr(Math.abs(l.amount))}</span>
+                </div>
+              ))}
             <div
               className="payroll-total-row payroll-total-row--pf"
-              title={`PF tax of ₹200 is deducted automatically when gross is ${fmtInr(PF_TAX_THRESHOLD)} or more`}
+              title={`PF Tax of ₹200 is deducted automatically when gross is ${fmtInr(PF_TAX_THRESHOLD)} or more`}
             >
               <span>
-                PF / tax {total.pf > 0 ? <em>(gross ≥ ₹25,000)</em> : <em>(waived, gross &lt; ₹25,000)</em>}
+                PF Tax {total.pf > 0 ? <em>(gross ≥ ₹25,000)</em> : <em>(waived, gross &lt; ₹25,000)</em>}
               </span>
               <span className={total.pf > 0 ? "pf-minus" : "pf-zero"}>
                 {total.pf > 0 ? `− ${fmtInr(total.pf)}` : fmtInr(0)}
@@ -367,7 +442,7 @@ export function PayrollPage() {
           </div>
         </form>
       ) : isHr ? (
-        <p className="muted">Only Chai and Nagendra can create payslips or run payment.</p>
+        <p className="muted">Only the payroll team can create payslips or run payment.</p>
       ) : (
         <p className="muted">Salary amounts for other people are never shown to this role.</p>
       )}

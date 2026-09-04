@@ -46,7 +46,7 @@ const EXCLUDED_FROM_PAYROLL = new Set(["emp-manoj", "emp-chai"]);
 
 export async function createPayslip({ user, actorEmployeeId, employeeId, period, baseSalary, extras, requestId, ip }) {
   if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
-    throw new HttpError(403, "Only Chai and Nagendra can create payslips");
+    throw new HttpError(403, "Only the payroll team can create payslips");
   }
   const store = getStore();
   const emp = await store.getEmployeeById(employeeId);
@@ -83,7 +83,7 @@ export async function createPayslip({ user, actorEmployeeId, employeeId, period,
 
 export async function deletePayslip({ user, actorEmployeeId, id, requestId, ip }) {
   if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
-    throw new HttpError(403, "Only Chai and Nagendra can delete payslips");
+    throw new HttpError(403, "Only the payroll team can delete payslips");
   }
   const store = getStore();
   const deleted = await store.deletePayslip(id);
@@ -100,7 +100,7 @@ export async function deletePayslip({ user, actorEmployeeId, id, requestId, ip }
 
 export async function runPayment({ user, actorEmployeeId, idempotencyKey }) {
   if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
-    throw new HttpError(403, "Only Chai and Nagendra can run payment");
+    throw new HttpError(403, "Only the payroll team can run payment");
   }
   const store = getStore();
   const existing = await store.findPaymentRunByKey(idempotencyKey);

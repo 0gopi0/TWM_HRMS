@@ -105,7 +105,7 @@ function loadLogo() {
   return logoPromise;
 }
 
-function buildPayslipPdf({ employeeName, employeeNumber, jobTitle, period, extras, pfTax, baseAmount, grossAmount, netAmount, logo }) {
+function buildPayslipPdf({ employeeName, employeeNumber, jobTitle, period, extras, pfTax, baseAmount, netAmount, logo }) {
   const ops = [];
   const out = (s) => ops.push(s);
 
@@ -191,18 +191,30 @@ function buildPayslipPdf({ employeeName, employeeNumber, jobTitle, period, extra
   };
 
   // ── Earnings table ────────────────────────────────────────────────────
+  // Extras carry a sign: positive lines are earnings (bonus, travel), negative
+  // lines are deductions (LOP, PF, advances) — split them into their own
+  // sections rather than netting a deduction into "gross earnings".
+  const earningsItems = (extras ?? []).filter((l) => Number(l.amount) > 0);
+  const deductionItems = (extras ?? []).filter((l) => Number(l.amount) < 0);
+  const earningsTotal =
+    Math.round((Number(baseAmount) + earningsItems.reduce((s, l) => s + Number(l.amount), 0) + Number.EPSILON) * 100) /
+    100;
+
   section("EARNINGS");
   subHead("Description", "Amount");
   row("Base salary", money(baseAmount));
-  for (const lineItem of extras ?? []) {
+  for (const lineItem of earningsItems) {
     row(String(lineItem.label || "Additional amount"), money(lineItem.amount));
   }
-  row("Gross earnings", money(grossAmount), { bold: true });
+  row("Gross earnings", money(earningsTotal), { bold: true });
 
   // ── Deductions table ──────────────────────────────────────────────────
   section("DEDUCTIONS");
   subHead("Description", "Amount");
-  row("PF / Tax", money(pfTax));
+  for (const lineItem of deductionItems) {
+    row(String(lineItem.label || "Deduction"), money(Math.abs(lineItem.amount)));
+  }
+  row("PF Tax", money(pfTax));
   y -= 10;
 
   // Net pay band
