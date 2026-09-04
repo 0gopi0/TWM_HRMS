@@ -76,6 +76,8 @@ export function EmployeesPage() {
   const [lopForm, setLopForm] = useState(emptyLopForm);
   const [lopSaving, setLopSaving] = useState(false);
   const [lopError, setLopError] = useState("");
+  const [editingLopId, setEditingLopId] = useState(null);
+  const [removingLopId, setRemovingLopId] = useState(null);
 
   async function load() {
     const jobs = [api("/api/v1/employees?pageSize=100"), api("/api/v1/attendance/all")];
@@ -145,14 +147,47 @@ export function EmployeesPage() {
     return map;
   }, [leaveRows]);
 
+  // All LOP entries logged for one employee, newest first — shown in the
+  // modal below the form so HR can edit or remove any of them.
+  const lopListFor = useMemo(() => {
+    const map = new Map();
+    for (const row of leaveRows) {
+      if (!row.isLop) continue;
+      const list = map.get(row.employeeId) || [];
+      list.push(row);
+      map.set(row.employeeId, list);
+    }
+    for (const list of map.values()) list.sort((a, b) => (a.startDate < b.startDate ? 1 : -1));
+    return map;
+  }, [leaveRows]);
+
   function openLopModal(emp) {
     setLopFor(emp.id);
     setLopForm(emptyLopForm());
+    setEditingLopId(null);
     setLopError("");
   }
 
   function closeLopModal() {
     setLopFor(null);
+    setEditingLopId(null);
+    setLopError("");
+  }
+
+  function startEditLop(row) {
+    setEditingLopId(row.id);
+    setLopForm({
+      startDate: row.startDate,
+      endDate: row.endDate,
+      halfDay: Boolean(row.halfDay),
+      reason: row.reason || "",
+    });
+    setLopError("");
+  }
+
+  function cancelEditLop() {
+    setEditingLopId(null);
+    setLopForm(emptyLopForm());
     setLopError("");
   }
 
@@ -165,24 +200,44 @@ export function EmployeesPage() {
     }
     setLopSaving(true);
     try {
-      await api("/api/v1/leave/managed", {
-        method: "POST",
-        body: JSON.stringify({
-          employeeId: lopFor,
-          leaveType: "unpaid",
-          startDate: lopForm.startDate,
-          endDate: lopForm.endDate,
-          halfDay: lopForm.startDate === lopForm.endDate ? lopForm.halfDay : false,
-          reason: lopForm.reason.trim() || undefined,
-          status: "approved",
-        }),
-      });
-      closeLopModal();
+      const body = {
+        leaveType: "unpaid",
+        startDate: lopForm.startDate,
+        endDate: lopForm.endDate,
+        halfDay: lopForm.startDate === lopForm.endDate ? lopForm.halfDay : false,
+        reason: lopForm.reason.trim() || undefined,
+        status: "approved",
+      };
+      if (editingLopId) {
+        await api(`/api/v1/leave/${editingLopId}`, { method: "PATCH", body: JSON.stringify(body) });
+      } else {
+        await api("/api/v1/leave/managed", {
+          method: "POST",
+          body: JSON.stringify({ ...body, employeeId: lopFor }),
+        });
+      }
+      setEditingLopId(null);
+      setLopForm(emptyLopForm());
       await load();
     } catch (err) {
       setLopError(err.message);
     } finally {
       setLopSaving(false);
+    }
+  }
+
+  async function removeLop(row) {
+    if (!window.confirm(`Remove this LOP entry (${row.startDate} → ${row.endDate})? This can't be undone.`)) return;
+    setLopError("");
+    setRemovingLopId(row.id);
+    try {
+      await api(`/api/v1/leave/${row.id}`, { method: "DELETE" });
+      if (editingLopId === row.id) cancelEditLop();
+      await load();
+    } catch (err) {
+      setLopError(err.message);
+    } finally {
+      setRemovingLopId(null);
     }
   }
 
@@ -575,71 +630,118 @@ export function EmployeesPage() {
 
       {lopFor ? (
         <div className="modal-scrim" onClick={closeLopModal}>
-          <form
-            className="card modal-card"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={submitLop}
-          >
-            <h2>Log LOP — {byId[lopFor]?.legalName}</h2>
+          <div className="card modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2>
+              {editingLopId ? "Edit LOP" : "Log LOP"} — {byId[lopFor]?.legalName}
+            </h2>
             <p className="muted" style={{ marginTop: -8 }}>
               Recorded as an approved LOP (loss of pay) day, and deducted from this employee's next payslip for
               the period it falls in.
             </p>
             {lopError ? <p className="error">{lopError}</p> : null}
-            <div className="date-row">
+            <form onSubmit={submitLop}>
+              <div className="date-row">
+                <label>
+                  Start
+                  <input
+                    type="date"
+                    value={lopForm.startDate}
+                    onChange={(e) =>
+                      setLopForm((f) => ({
+                        ...f,
+                        startDate: e.target.value,
+                        endDate: f.endDate < e.target.value ? e.target.value : f.endDate,
+                      }))
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  End
+                  <input
+                    type="date"
+                    min={lopForm.startDate}
+                    value={lopForm.endDate}
+                    onChange={(e) => setLopForm((f) => ({ ...f, endDate: e.target.value }))}
+                    required
+                  />
+                </label>
+              </div>
+              {lopForm.startDate === lopForm.endDate ? (
+                <label className="half-day">
+                  <input
+                    type="checkbox"
+                    checked={lopForm.halfDay}
+                    onChange={(e) => setLopForm((f) => ({ ...f, halfDay: e.target.checked }))}
+                  />
+                  Half day
+                </label>
+              ) : null}
               <label>
-                Start
+                Reason
                 <input
-                  type="date"
-                  value={lopForm.startDate}
-                  onChange={(e) =>
-                    setLopForm((f) => ({
-                      ...f,
-                      startDate: e.target.value,
-                      endDate: f.endDate < e.target.value ? e.target.value : f.endDate,
-                    }))
-                  }
-                  required
+                  value={lopForm.reason}
+                  onChange={(e) => setLopForm((f) => ({ ...f, reason: e.target.value }))}
+                  placeholder="e.g. No-show, unapproved absence — shown to the employee"
                 />
               </label>
-              <label>
-                End
-                <input
-                  type="date"
-                  min={lopForm.startDate}
-                  value={lopForm.endDate}
-                  onChange={(e) => setLopForm((f) => ({ ...f, endDate: e.target.value }))}
-                  required
-                />
-              </label>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn btn-primary" type="submit" disabled={lopSaving}>
+                  {lopSaving ? "Saving…" : editingLopId ? "Save changes" : "Log LOP"}
+                </button>
+                {editingLopId ? (
+                  <button className="btn btn-ghost" type="button" onClick={cancelEditLop} disabled={lopSaving}>
+                    Cancel edit
+                  </button>
+                ) : (
+                  <button className="btn btn-ghost" type="button" onClick={closeLopModal} disabled={lopSaving}>
+                    Close
+                  </button>
+                )}
+              </div>
+            </form>
+
+            <div className="lop-list-wrap">
+              <h3 className="lop-list-title">Logged LOP entries</h3>
+              {!(lopListFor.get(lopFor) || []).length ? (
+                <p className="muted" style={{ fontSize: 13 }}>
+                  No LOP entries logged yet.
+                </p>
+              ) : (
+                <ul className="lop-list">
+                  {(lopListFor.get(lopFor) || []).map((row) => (
+                    <li key={row.id} className="lop-list-item">
+                      <div className="lop-list-main">
+                        <strong>
+                          {row.startDate === row.endDate ? row.startDate : `${row.startDate} → ${row.endDate}`}
+                          {row.halfDay ? " · half day" : ""}
+                        </strong>
+                        {row.reason ? <span className="muted">{row.reason}</span> : null}
+                      </div>
+                      <div className="lop-list-actions">
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={() => startEditLop(row)}
+                          disabled={lopSaving || removingLopId === row.id}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={() => removeLop(row)}
+                          disabled={lopSaving || removingLopId === row.id}
+                        >
+                          {removingLopId === row.id ? "…" : "Remove"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            {lopForm.startDate === lopForm.endDate ? (
-              <label className="half-day">
-                <input
-                  type="checkbox"
-                  checked={lopForm.halfDay}
-                  onChange={(e) => setLopForm((f) => ({ ...f, halfDay: e.target.checked }))}
-                />
-                Half day
-              </label>
-            ) : null}
-            <label>
-              Reason
-              <input
-                value={lopForm.reason}
-                onChange={(e) => setLopForm((f) => ({ ...f, reason: e.target.value }))}
-                placeholder="e.g. No-show, unapproved absence — shown to the employee"
-              />
-            </label>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn btn-primary" type="submit" disabled={lopSaving}>
-                {lopSaving ? "Saving…" : "Log LOP"}
-              </button>
-              <button className="btn btn-ghost" type="button" onClick={closeLopModal} disabled={lopSaving}>
-                Cancel
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       ) : null}
     </div>

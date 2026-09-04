@@ -219,7 +219,9 @@ export function LeavePage() {
                           <span className="leave-item-reject">Reason: {row.rejectionReason}</span>
                         ) : null}
                       </div>
-                      <span className={`leave-status ${row.status}`}>{row.status.replaceAll("_", " ")}</span>
+                      <span className={`leave-status ${row.isLop ? "lop" : row.status}`}>
+                        {row.isLop ? "Issued" : row.status.replaceAll("_", " ")}
+                      </span>
                     </li>
                   );
                 })}

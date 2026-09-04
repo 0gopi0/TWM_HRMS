@@ -173,6 +173,12 @@ export async function createMemoryStore() {
       Object.assign(row, patch);
       return row;
     },
+    async deleteLeave(id) {
+      const idx = leaveRequests.findIndex((r) => r.id === id);
+      if (idx === -1) return false;
+      leaveRequests.splice(idx, 1);
+      return true;
+    },
     async addLeaveApproval(row) {
       leaveApprovals.push(row);
       return row;

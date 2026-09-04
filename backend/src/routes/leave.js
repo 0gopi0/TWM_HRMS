@@ -187,6 +187,20 @@ leaveRouter.patch(
   },
 );
 
+leaveRouter.delete(
+  "/:id",
+  authorize(PERMISSIONS.LEAVE_POLICY_WRITE),
+  validate({ params: z.object({ id: z.string().min(1) }) }),
+  async (req, res, next) => {
+    try {
+      await leaveService.deleteManagedLeave({ actor: req.user, leaveId: req.params.id });
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 leaveRouter.post(
   "/:id/decide",
   validate({

@@ -356,6 +356,10 @@ export async function createMysqlStore() {
       );
       return this.getLeave(id);
     },
+    async deleteLeave(id) {
+      const [result] = await pool.query("DELETE FROM leave_requests WHERE id = ?", [id]);
+      return result.affectedRows > 0;
+    },
     async addLeaveApproval(row) {
       await pool.query(
         `INSERT INTO leave_approvals (id, leave_request_id, step, actor_user_id, decision, comment)

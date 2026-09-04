@@ -264,6 +264,9 @@ export async function updateManagedLeave({ actor, leaveId, leaveType, startDate,
   const store = getStore();
   const existing = await store.getLeave(leaveId);
   if (!existing) throw new HttpError(404, "Leave request not found");
+  // This route is only wired up for editing HR-logged LOP entries — editing
+  // an employee's own submitted leave here would bypass the approval flow.
+  if (!existing.isLop) throw new HttpError(422, "Only LOP entries can be edited here");
   assertLeaveWindow({ leaveType, startDate, endDate, enforceNotice: false });
   const next = {
     leaveType,
@@ -289,6 +292,31 @@ export async function updateManagedLeave({ actor, leaveId, leaveType, startDate,
     afterJson: next,
   });
   return updated;
+}
+
+export async function deleteManagedLeave({ actor, leaveId }) {
+  const store = getStore();
+  const existing = await store.getLeave(leaveId);
+  if (!existing) throw new HttpError(404, "Leave request not found");
+  // Same restriction as edit: only ever remove an HR-logged LOP entry, never
+  // an employee's own submitted (and possibly already-approved) request.
+  if (!existing.isLop) throw new HttpError(422, "Only LOP entries can be deleted here");
+  await store.deleteLeave(leaveId);
+  await store.writeAudit({
+    actorUserId: actor.id,
+    action: "leave.manage.delete",
+    entity: "leave_request",
+    entityId: leaveId,
+    beforeJson: {
+      employeeId: existing.employeeId,
+      leaveType: existing.leaveType,
+      startDate: asYmd(existing.startDate),
+      endDate: asYmd(existing.endDate),
+      halfDay: Boolean(existing.halfDay),
+      reason: existing.reason,
+    },
+    afterJson: null,
+  });
 }
 
 export async function decideLeave({ user, leaveId, decision, comment }) {

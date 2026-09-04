@@ -495,8 +495,8 @@ export function DashboardPage() {
                         <span className="leave-item-reject">{l.rejectionReason}</span>
                       ) : null}
                     </div>
-                    <span className={`leave-status ${l.status}`}>
-                      {String(l.status).replaceAll("_", " ")}
+                    <span className={`leave-status ${l.isLop ? "lop" : l.status}`}>
+                      {l.isLop ? "Issued" : String(l.status).replaceAll("_", " ")}
                     </span>
                   </li>
                 );
