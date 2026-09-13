@@ -5,33 +5,35 @@
   --navy-600: #102647;
   --navy-500: #16345c;
   --navy-300: #2c4a78;
-  --amber: #38bdf8;
-  --amber-deep: #0ea5e9;
-  --bg: #eef3f8;
+  --amber: #6c93ff;
+  --amber-deep: #4c74f2;
+  --c-teal: #0ea5a4;
+  --c-violet: #7c6fee;
+  --bg: #f3f6fc;
   --bg-elev: #ffffff;
-  --bg-muted: #dce7f2;
-  --text: #071428;
-  --text-muted: #5a7290;
-  --text-soft: #8a9db8;
-  --border: #d4e0ee;
-  --border-strong: #c5d5e6;
-  --accent: #2a9bc4;
-  --accent-text: #062033;
+  --bg-muted: #eaf0fa;
+  --text: #10192b;
+  --text-muted: #5b6b85;
+  --text-soft: #93a1b8;
+  --border: #e3e9f5;
+  --border-strong: #d2dcee;
+  --accent: #2f5fee;
+  --accent-text: #ffffff;
   --danger: #b42318;
   --warning: #b97903;
   --success: #1f9d55;
-  --shadow-sm: 0 1px 2px rgba(7, 20, 40, 0.05);
-  --shadow: 0 1px 3px rgba(7, 20, 40, 0.05), 0 6px 18px rgba(7, 20, 40, 0.06);
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 39, 0.04);
+  --shadow: 0 4px 10px rgba(16, 24, 39, 0.04), 0 16px 32px rgba(16, 24, 39, 0.07);
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 20px;
   --sidebar: 220px;
   --header: 60px;
   --topbar-bg: var(--navy);
   --topbar-text: #c8d4e6;
   --topbar-text-strong: #ffffff;
-  --nav-active-bg: var(--amber);
-  --nav-active-text: var(--navy);
+  --nav-active-bg: var(--accent);
+  --nav-active-text: #ffffff;
   --sidebar-bg: var(--navy);
   --sidebar-text: #a8b8d2;
   font-family: "Inter", "Segoe UI", system-ui, sans-serif;
@@ -44,28 +46,30 @@
   --navy-600: #102647;
   --navy-500: #16345c;
   --navy-300: #2c4a78;
-  --amber: #38bdf8;
-  --amber-deep: #0ea5e9;
-  --bg: #0a1730;
-  --bg-elev: #11244a;
-  --bg-muted: #16345c;
-  --text: #eef3fb;
-  --text-muted: #9fb2cf;
-  --text-soft: #6b7f9c;
+  --amber: #6c93ff;
+  --amber-deep: #4c74f2;
+  --c-teal: #2dd4c7;
+  --c-violet: #a796ff;
+  --bg: #0a1017;
+  --bg-elev: #131b2e;
+  --bg-muted: #182338;
+  --text: #eef1fb;
+  --text-muted: #9aa4bf;
+  --text-soft: #64708c;
   --border: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.18);
-  --accent: #7ec8ea;
-  --accent-text: #062033;
+  --accent: #6c93ff;
+  --accent-text: #071022;
   --danger: #ff9b8a;
   --warning: #f0c361;
   --success: #4dc889;
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-  --topbar-bg: #071428;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  --topbar-bg: #070c18;
   --topbar-text: #c8d4e6;
   --topbar-text-strong: #ffffff;
-  --nav-active-bg: var(--amber);
-  --nav-active-text: var(--navy);
-  --sidebar-bg: #071428;
+  --nav-active-bg: var(--accent);
+  --nav-active-text: var(--accent-text);
+  --sidebar-bg: #070c18;
   --sidebar-text: #a8b8d2;
 }
 
@@ -163,7 +167,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: var(--nav-active-bg);
   color: var(--nav-active-text);
   font-weight: 700;
-  box-shadow: 0 6px 16px rgba(56, 189, 248, 0.22);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .sidebar-ico {
   display: inline-flex;
@@ -279,9 +283,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   text-transform: uppercase;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.18);
-  color: var(--amber);
-  border: 1px solid rgba(56, 189, 248, 0.32);
+  /* Sits on the always-dark topbar/sidebar chrome regardless of app theme,
+     so it uses a fixed light-blue tone rather than the theme-switched accent. */
+  background: rgba(108, 147, 255, 0.18);
+  color: #8fabff;
+  border: 1px solid rgba(108, 147, 255, 0.34);
 }
 
 .theme-switch {
@@ -540,10 +546,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--accent);
 }
 .stat-card.amber .stat-icon {
-  background: rgba(56, 189, 248, 0.14);
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
   color: var(--amber-deep);
 }
 :root[data-theme="dark"] .stat-card.amber .stat-icon { color: var(--amber); }
+.stat-card.blue .stat-icon {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.stat-card.teal .stat-icon {
+  background: color-mix(in srgb, var(--c-teal) 16%, transparent);
+  color: var(--c-teal);
+}
+.stat-card.violet .stat-icon {
+  background: color-mix(in srgb, var(--c-violet) 16%, transparent);
+  color: var(--c-violet);
+}
+.stat-card.green .stat-icon {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+}
 
 /* ─── Today's status card (live shift) ───────────────────────────────── */
 .status-value {
@@ -624,13 +646,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-primary {
-  background: var(--navy);
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--accent-text);
   border-color: transparent;
 }
-:root[data-theme="dark"] .btn-primary { background: var(--accent); color: var(--accent-text); }
 .btn-primary:hover:not(:disabled) {
-  background: var(--navy-700);
+  background: color-mix(in srgb, var(--accent) 88%, black);
   border-color: transparent;
 }
 :root[data-theme="dark"] .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, white); }
@@ -918,7 +939,12 @@ input:focus, select:focus, textarea:focus {
   background: var(--accent);
   border-radius: 999px;
 }
-:root[data-theme="dark"] .balance-bar > span { background: var(--amber); }
+/* Each leave type keeps the same hue as its badge elsewhere in the app
+   (sick/casual/unpaid), so the balance card and the leave-request list read
+   as one consistent color language. */
+.balance-card.sick .balance-bar > span { background: var(--danger); }
+.balance-card.casual .balance-bar > span { background: var(--accent); }
+.balance-card.unpaid .balance-bar > span { background: var(--amber); }
 
 /* ─── My recent leave requests (dashboard list) ───────────────────────── */
 .leave-list {
@@ -1515,8 +1541,8 @@ input:focus, select:focus, textarea:focus {
   --ink: #f4f7fb;
   --mist: #9db0c9;
   --line: rgba(255, 255, 255, 0.12);
-  --glow: #7ec8ea;
-  --glow-deep: #4eb4dc;
+  --glow: #6c93ff;
+  --glow-deep: #4c74f2;
   min-height: 100%;
   position: relative;
   overflow: hidden;

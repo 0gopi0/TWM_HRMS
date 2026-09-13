@@ -276,7 +276,7 @@ export function DashboardPage() {
         {/* Org-wide stats — owner / HR only */}
         {orgStats ? (
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
-            <article className="stat-card amber">
+            <article className="stat-card blue">
               <div className="stat-icon">
                 <SparkIcon
                   d={
@@ -298,7 +298,7 @@ export function DashboardPage() {
               <span className="stat-label">On shift now</span>
               <span className="stat-trend">{orgStats.clockedInToday} clocked in today</span>
             </article>
-            <article className="stat-card">
+            <article className="stat-card violet">
               <div className="stat-icon">
                 <SparkIcon
                   d={
@@ -314,7 +314,7 @@ export function DashboardPage() {
               <span className="stat-label">On leave today</span>
               <span className="stat-trend">Approved time off</span>
             </article>
-            <article className="stat-card">
+            <article className="stat-card amber">
               <div className="stat-icon">
                 <SparkIcon d={<path d="M4 6h16M4 12h16M4 18h10" />} />
               </div>
@@ -322,7 +322,7 @@ export function DashboardPage() {
               <span className="stat-label">Pending approvals</span>
               <span className="stat-trend">Leave awaiting decision</span>
             </article>
-            <article className="stat-card">
+            <article className="stat-card teal">
               <div className="stat-icon">
                 <SparkIcon
                   d={
@@ -339,7 +339,7 @@ export function DashboardPage() {
               <span className="stat-label">Active employees</span>
               <span className="stat-trend">{orgStats.total - orgStats.active} inactive</span>
             </article>
-            <article className="stat-card">
+            <article className="stat-card green">
               <div className="stat-icon">
                 <SparkIcon
                   d={
@@ -362,7 +362,7 @@ export function DashboardPage() {
         {/* KPI stat cards */}
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
           <article
-            className={`stat-card amber${shiftInfo.tone === "live" ? " status-live" : ""}`}
+            className={`stat-card blue${shiftInfo.tone === "live" ? " status-live" : ""}`}
             style={isOwner ? { maxWidth: 230 } : undefined}
           >
             <div className="stat-icon">
@@ -381,7 +381,7 @@ export function DashboardPage() {
           </article>
           {isOwner ? null : (
             <>
-              <article className="stat-card">
+              <article className="stat-card teal">
                 <div className="stat-icon">
                   <SparkIcon d={<><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /></>} />
                 </div>
@@ -389,7 +389,7 @@ export function DashboardPage() {
                 <span className="stat-label">Leave days (this month)</span>
                 <span className="stat-trend">Approved leaves</span>
               </article>
-              <article className="stat-card">
+              <article className="stat-card violet">
                 <div className="stat-icon">
                   <SparkIcon d={<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>} />
                 </div>
@@ -431,34 +431,36 @@ export function DashboardPage() {
           {!balances?.items?.length ? (
             <p className="muted">No leave balance available yet.</p>
           ) : (
-            <div
-              className="grid"
-              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
-            >
-              {balances.items.map((item) => {
-                const allotted = item.allotted || 0;
-                const used = item.used || 0;
-                const remaining = item.remaining ?? Math.max(allotted - used, 0);
-                const pct = allotted ? Math.min(100, Math.round((used / allotted) * 100)) : 0;
-                return (
-                  <div key={item.leaveType} className="balance-card">
-                    <h3>{item.label || LEAVE_TYPE_LABELS[item.leaveType] || item.leaveType}</h3>
-                    <p className="balance-remain">
-                      {remaining == null ? "Unlimited" : `${remaining} left`}
-                    </p>
-                    <p className="balance-meta">
-                      {allotted ? `${used} used of ${allotted}` : "No yearly cap"}
-                      {item.pending ? ` · ${item.pending} pending` : ""}
-                    </p>
-                    {allotted ? (
-                      <div className="balance-bar" aria-hidden="true">
-                        <span style={{ width: `${pct}%` }} />
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              <div
+                className="grid"
+                style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
+              >
+                {balances.items.map((item) => {
+                  const allotted = item.allotted || 0;
+                  const used = item.used || 0;
+                  const remaining = item.remaining ?? Math.max(allotted - used, 0);
+                  const pct = allotted ? Math.min(100, Math.round((used / allotted) * 100)) : 0;
+                  return (
+                    <div key={item.leaveType} className={`balance-card ${item.leaveType}`}>
+                      <h3>{item.label || LEAVE_TYPE_LABELS[item.leaveType] || item.leaveType}</h3>
+                      <p className="balance-remain">
+                        {remaining == null ? "Unlimited" : `${remaining} left`}
+                      </p>
+                      <p className="balance-meta">
+                        {allotted ? `${used} used of ${allotted}` : "No yearly cap"}
+                        {item.pending ? ` · ${item.pending} pending` : ""}
+                      </p>
+                      {allotted ? (
+                        <div className="balance-bar" aria-hidden="true">
+                          <span style={{ width: `${pct}%` }} />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </article>
 

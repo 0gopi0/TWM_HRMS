@@ -23,7 +23,7 @@ export function buildOrgForest(employees, usersById, statusById = new Map()) {
 }
 
 // Derive a live status for each employee:
-//   on_leave  -> has ANY approved leave (current, upcoming or past)
+//   on_leave  -> has an approved leave that covers today
 //   active    -> currently clocked in (open attendance entry)
 //   inactive  -> not clocked in
 // On leave takes precedence over clock-in status.
@@ -32,8 +32,11 @@ export async function computeStatusById(store, employees) {
     store.listLeave(),
     store.listAllAttendance(),
   ]);
+  const today = new Date().toLocaleDateString("en-CA");
   const onLeave = new Set(
-    leaveRows.filter((r) => r.status === "approved").map((r) => r.employeeId),
+    leaveRows
+      .filter((r) => r.status === "approved" && r.startDate <= today && r.endDate >= today)
+      .map((r) => r.employeeId),
   );
   const clockedIn = new Set(attendanceRows.filter((a) => !a.clockOutAt).map((a) => a.employeeId));
   const map = new Map();
