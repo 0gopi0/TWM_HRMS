@@ -1,5 +1,6 @@
 import { labelForRole } from "@twm/shared";
 import { getStore } from "../store/index.js";
+import { asYmd } from "./leaveService.js";
 
 export function buildOrgForest(employees, usersById, statusById = new Map()) {
   const nodes = employees.map((e) => ({
@@ -33,9 +34,14 @@ export async function computeStatusById(store, employees) {
     store.listAllAttendance(),
   ]);
   const today = new Date().toLocaleDateString("en-CA");
+  // MySQL hands back DATE columns as Date objects, so normalize to YYYY-MM-DD
+  // strings before comparing with `today` — same as the calendar and the
+  // clock-in guard do.
   const onLeave = new Set(
     leaveRows
-      .filter((r) => r.status === "approved" && r.startDate <= today && r.endDate >= today)
+      .filter(
+        (r) => r.status === "approved" && asYmd(r.startDate) <= today && asYmd(r.endDate) >= today,
+      )
       .map((r) => r.employeeId),
   );
   const clockedIn = new Set(attendanceRows.filter((a) => !a.clockOutAt).map((a) => a.employeeId));
