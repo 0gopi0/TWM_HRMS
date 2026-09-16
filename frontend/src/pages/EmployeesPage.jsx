@@ -16,6 +16,34 @@ function dayKey(iso) {
   return d.toLocaleDateString("en-CA");
 }
 
+function currentMonthKey() {
+  return new Date().toLocaleDateString("en-CA").slice(0, 7);
+}
+
+function monthLabel(key) {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString([], { month: "long", year: "numeric" });
+}
+
+function fmtDay(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  return d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+}
+
+// Minutes worked on an entry; null while a shift is still open.
+function entryMinutes(entry) {
+  if (!entry?.clockOutAt) return null;
+  return Math.max(0, Math.round((new Date(entry.clockOutAt) - new Date(entry.clockInAt)) / 60000));
+}
+
+function fmtHours(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (!h) return `${m}m`;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 // Days an (approved, unpaid) leave row overlaps the current calendar month —
 // same "full days, or 0.5 for a half-day single-day leave" rule the backend
 // uses for leave balances, just bounded to this month instead of the year.
@@ -78,6 +106,9 @@ export function EmployeesPage() {
   const [lopError, setLopError] = useState("");
   const [editingLopId, setEditingLopId] = useState(null);
   const [removingLopId, setRemovingLopId] = useState(null);
+  // Person whose attendance detail tab is open (null = the directory tab).
+  const [attendanceFor, setAttendanceFor] = useState(null);
+  const [attMonth, setAttMonth] = useState(currentMonthKey);
 
   async function load() {
     const jobs = [api("/api/v1/employees?pageSize=100"), api("/api/v1/attendance/all")];
@@ -105,6 +136,27 @@ export function EmployeesPage() {
   }, []);
 
   const byId = Object.fromEntries(rows.map((e) => [e.id, e]));
+  const attendancePerson = attendanceFor ? byId[attendanceFor] : null;
+
+  // One person's clock in/out for the selected month, newest day first.
+  // Clock in is limited to one entry per day, so each row is a day.
+  const attendanceDetail = useMemo(() => {
+    if (!attendanceFor) return null;
+    const entries = attendance
+      .filter((a) => a.employeeId === attendanceFor && dayKey(a.clockInAt).slice(0, 7) === attMonth)
+      .sort((a, b) => (a.clockInAt < b.clockInAt ? 1 : -1));
+    return {
+      entries,
+      totalMinutes: entries.reduce((sum, a) => sum + (entryMinutes(a) ?? 0), 0),
+      openCount: entries.filter((a) => !a.clockOutAt).length,
+    };
+  }, [attendance, attendanceFor, attMonth]);
+
+  function openAttendance(emp) {
+    setAttendanceFor(emp.id);
+    setAttMonth(currentMonthKey());
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   // The one person with no manager is the top of the org chart (Manoj).
   const orgTop = useMemo(() => rows.find((e) => !e.managerId), [rows]);
@@ -379,6 +431,29 @@ export function EmployeesPage() {
           </p>
         </div>
       </div>
+      <div className="page-tabs" role="tablist" aria-label="People sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!attendanceFor}
+          className={`page-tab${attendanceFor ? "" : " on"}`}
+          onClick={() => setAttendanceFor(null)}
+        >
+          Directory
+        </button>
+        {attendancePerson ? (
+          <button
+            type="button"
+            role="tab"
+            aria-selected
+            className="page-tab on"
+            title="Back to the directory"
+            onClick={() => setAttendanceFor(null)}
+          >
+            Attendance — {attendancePerson.legalName}
+          </button>
+        ) : null}
+      </div>
       {error ? <p className="error">{error}</p> : null}
 
       {canManage ? (
@@ -507,6 +582,78 @@ export function EmployeesPage() {
         </form>
       ) : null}
 
+      {attendanceFor ? (
+        <div className="card table-card">
+          <div className="table-head">
+            <h2>{attendancePerson?.legalName || "Employee"} — attendance</h2>
+            <span className="muted" style={{ fontSize: 12 }}>
+              {attendancePerson?.employeeNumber || ""}
+              {attendancePerson?.jobTitle ? ` · ${attendancePerson.jobTitle}` : ""}
+            </span>
+            <span className="spacer" />
+            <label className="muted" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              Month
+              <input
+                type="month"
+                value={attMonth}
+                max={currentMonthKey()}
+                onChange={(e) => setAttMonth(e.target.value)}
+              />
+            </label>
+          </div>
+          {attendanceDetail.entries.length ? (
+            <p className="muted" style={{ padding: "0 22px 12px", margin: 0, fontSize: 12 }}>
+              {monthLabel(attMonth)} · {attendanceDetail.entries.length}{" "}
+              {attendanceDetail.entries.length === 1 ? "day" : "days"} recorded ·{" "}
+              {fmtHours(attendanceDetail.totalMinutes)} clocked
+              {attendanceDetail.openCount
+                ? ` · ${attendanceDetail.openCount} not clocked out`
+                : ""}
+            </p>
+          ) : null}
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Clock in</th>
+                  <th>Clock out</th>
+                  <th>Hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attendanceDetail.entries.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="muted" style={{ padding: "20px 22px" }}>
+                      No clock in/out recorded in {monthLabel(attMonth)}.
+                    </td>
+                  </tr>
+                ) : (
+                  attendanceDetail.entries.map((a) => {
+                    const mins = entryMinutes(a);
+                    return (
+                      <tr key={a.id}>
+                        <td>
+                          <strong>{fmtDay(a.clockInAt)}</strong>
+                        </td>
+                        <td>{fmtTime(a.clockInAt)}</td>
+                        <td>
+                          {a.clockOutAt ? (
+                            fmtTime(a.clockOutAt)
+                          ) : (
+                            <span className="employment-pill active">In progress</span>
+                          )}
+                        </td>
+                        <td>{mins == null ? "—" : fmtHours(mins)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
       <div className="card table-card">
         <div className="table-head">
           <h2>Directory &amp; attendance</h2>
@@ -522,19 +669,20 @@ export function EmployeesPage() {
                 <th>Clock in</th>
                 <th>Clock out</th>
                 <th>{canManage ? "LOP" : "Status"}</th>
+                <th>Attendance</th>
                 {canManage ? <th></th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={canManage ? 8 : 7} className="muted" style={{ padding: "20px 22px" }}>
+                  <td colSpan={canManage ? 9 : 8} className="muted" style={{ padding: "20px 22px" }}>
                     Loading directory…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 8 : 7} className="muted" style={{ padding: "20px 22px" }}>
+                  <td colSpan={canManage ? 9 : 8} className="muted" style={{ padding: "20px 22px" }}>
                     No one to show yet.
                   </td>
                 </tr>
@@ -598,6 +746,15 @@ export function EmployeesPage() {
                           <span className={`employment-pill ${cls}`}>{status}</span>
                         )}
                       </td>
+                      <td>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={() => openAttendance(e)}
+                        >
+                          View more
+                        </button>
+                      </td>
                       {canManage ? (
                         <td>
                           <div style={{ display: "flex", gap: 8 }}>
@@ -627,6 +784,7 @@ export function EmployeesPage() {
           </table>
         </div>
       </div>
+      )}
 
       {lopFor ? (
         <div className="modal-scrim" onClick={closeLopModal}>
