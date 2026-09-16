@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { HOLIDAY_KINDS } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
-import { isOnFullDayLeave } from "./leaveService.js";
+import { asYmd, isOnFullDayLeave } from "./leaveService.js";
 
 function mapEntry(row) {
   if (!row) return null;
@@ -11,6 +12,26 @@ function mapEntry(row) {
     clockInAt: row.clockInAt,
     clockOutAt: row.clockOutAt,
   };
+}
+
+// Saturdays, Sundays, and festival holidays are company-wide days off, so
+// clock in/out is disabled on them. Optional holidays are not enforced —
+// employees choose whether to take those.
+export async function getDayOff(ymd) {
+  const weekday = new Date(`${ymd}T00:00:00`).getDay();
+  if (weekday === 0 || weekday === 6) {
+    return { type: "weekend", label: weekday === 0 ? "Sunday" : "Saturday" };
+  }
+  const holiday = (await getStore().listHolidays()).find(
+    (h) => h.kind === HOLIDAY_KINDS.FESTIVAL && asYmd(h.date) === ymd,
+  );
+  return holiday ? { type: "holiday", label: holiday.name } : null;
+}
+
+function dayOffMessage(dayOff, action) {
+  return dayOff.type === "holiday"
+    ? `${dayOff.label} is a festival holiday — ${action} is disabled`
+    : `It's ${dayOff.label} — ${action} is disabled`;
 }
 
 function dayKey(iso) {
@@ -31,6 +52,7 @@ export async function getAttendanceStatus(employee) {
     clockInAt: open?.clockInAt || lastToday?.clockInAt || null,
     clockOutAt: open ? null : lastToday?.clockOutAt || null,
     today: todayEntries,
+    dayOff: await getDayOff(today),
   };
 }
 
@@ -40,6 +62,7 @@ export async function clockIn(employee) {
   const open = await store.getOpenAttendance(employee.id);
   if (open) throw new HttpError(409, "Already clocked in");
   const status = await getAttendanceStatus(employee);
+  if (status.dayOff) throw new HttpError(409, dayOffMessage(status.dayOff, "clock in"));
   if (status.completeForToday || status.today.length > 0) {
     throw new HttpError(409, "Already clocked for today");
   }
@@ -75,6 +98,8 @@ export async function clockOut(employee) {
   const store = getStore();
   const open = await store.getOpenAttendance(employee.id);
   if (!open) throw new HttpError(409, "Not clocked in");
+  const dayOff = await getDayOff(new Date().toLocaleDateString("en-CA"));
+  if (dayOff) throw new HttpError(409, dayOffMessage(dayOff, "clock out"));
   const clockOutAt = new Date().toISOString();
   await store.closeAttendance(open.id, clockOutAt);
   await store.writeAudit({

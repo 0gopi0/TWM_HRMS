@@ -108,6 +108,7 @@ export function DashboardPage() {
 
   const onShift = Boolean(attendance?.clockedIn);
   const doneToday = Boolean(attendance?.completeForToday);
+  const dayOff = attendance?.dayOff || null;
   const myId = user?.employee?.id;
 
   const myLeaves = useMemo(() => leaves.filter((l) => l.employeeId === myId), [leaves, myId]);
@@ -142,7 +143,11 @@ export function DashboardPage() {
   // value is the elapsed/total shift time, trend carries the clock times.
   const shiftInfo = useMemo(() => {
     if (!attendance?.clockInAt) {
-      return { tone: "idle", value: "—", trend: "Not clocked in yet" };
+      return {
+        tone: "idle",
+        value: "—",
+        trend: attendance?.dayOff ? `${attendance.dayOff.label} · day off` : "Not clocked in yet",
+      };
     }
     const inAt = new Date(attendance.clockInAt).getTime();
     if (attendance.clockedIn) {
@@ -229,7 +234,8 @@ export function DashboardPage() {
               <button
                 className="btn btn-danger"
                 type="button"
-                disabled={busy}
+                disabled={busy || Boolean(dayOff)}
+                title={dayOff ? `Clock out is disabled on ${dayOff.label}` : undefined}
                 onClick={() => punch("/api/v1/attendance/clock-out")}
               >
                 {busy ? "…" : "Clock out"}
@@ -237,6 +243,19 @@ export function DashboardPage() {
             ) : doneToday ? (
               <button className="btn" type="button" disabled>
                 Day complete
+              </button>
+            ) : dayOff ? (
+              <button
+                className="btn"
+                type="button"
+                disabled
+                title={
+                  dayOff.type === "holiday"
+                    ? `${dayOff.label} is a festival holiday`
+                    : `Clock in/out is disabled on ${dayOff.label}s`
+                }
+              >
+                {dayOff.label}
               </button>
             ) : onLeaveToday ? (
               <button className="btn" type="button" disabled title="You're on approved leave today">
@@ -266,7 +285,13 @@ export function DashboardPage() {
               </span>
             ) : null}
           </div>
-          {onLeaveToday && !doneToday ? (
+          {dayOff ? (
+            <p className="muted" style={{ fontSize: 12, margin: "10px 0 0" }}>
+              {dayOff.type === "holiday"
+                ? `${dayOff.label} is a festival holiday — clock in/out is disabled.`
+                : `It's ${dayOff.label} — clock in/out is disabled on weekends.`}
+            </p>
+          ) : onLeaveToday && !doneToday ? (
             <p className="muted" style={{ fontSize: 12, margin: "10px 0 0" }}>
               You're on approved leave today, so clock in is disabled. Half-day leave still allows clocking in/out.
             </p>
