@@ -5,10 +5,10 @@
   --navy-600: #102647;
   --navy-500: #16345c;
   --navy-300: #2c4a78;
-  --amber: #6c93ff;
-  --amber-deep: #4c74f2;
+  --amber: #00c7fd;
+  --amber-deep: #0068b5;
   --c-teal: #0ea5a4;
-  --c-violet: #7c6fee;
+  --c-violet: #0068b5;
   --bg: #f3f6fc;
   --bg-elev: #ffffff;
   --bg-muted: #eaf0fa;
@@ -46,10 +46,10 @@
   --navy-600: #102647;
   --navy-500: #16345c;
   --navy-300: #2c4a78;
-  --amber: #6c93ff;
-  --amber-deep: #4c74f2;
+  --amber: #00c7fd;
+  --amber-deep: #0068b5;
   --c-teal: #2dd4c7;
-  --c-violet: #a796ff;
+  --c-violet: #00c7fd;
   --bg: #0a1017;
   --bg-elev: #131b2e;
   --bg-muted: #182338;
@@ -58,7 +58,7 @@
   --text-soft: #64708c;
   --border: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.18);
-  --accent: #6c93ff;
+  --accent: #00c7fd;
   --accent-text: #071022;
   --danger: #ff9b8a;
   --warning: #f0c361;
@@ -285,9 +285,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-radius: 999px;
   /* Sits on the always-dark topbar/sidebar chrome regardless of app theme,
      so it uses a fixed light-blue tone rather than the theme-switched accent. */
-  background: rgba(108, 147, 255, 0.18);
-  color: #8fabff;
-  border: 1px solid rgba(108, 147, 255, 0.34);
+  background: rgba(0, 199, 253, 0.18);
+  color: #7fdcff;
+  border: 1px solid rgba(0, 199, 253, 0.34);
 }
 
 .theme-switch {
@@ -662,7 +662,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 700;
 }
 .btn-accent:hover:not(:disabled) {
-  background: var(--amber-deep);
+  background: color-mix(in srgb, var(--amber) 65%, var(--amber-deep));
   border-color: transparent;
 }
 .btn-danger {
@@ -869,7 +869,7 @@ input:focus, select:focus, textarea:focus {
 }
 .employment-pill.closed {
   background: color-mix(in srgb, var(--amber) 14%, transparent);
-  color: var(--amber);
+  color: var(--amber-deep);
   border-color: color-mix(in srgb, var(--amber) 32%, transparent);
 }
 
@@ -1541,8 +1541,8 @@ input:focus, select:focus, textarea:focus {
   --ink: #f4f7fb;
   --mist: #9db0c9;
   --line: rgba(255, 255, 255, 0.12);
-  --glow: #6c93ff;
-  --glow-deep: #4c74f2;
+  --glow: #00c7fd;
+  --glow-deep: #00afdf;
   min-height: 100%;
   position: relative;
   overflow: hidden;
@@ -1859,7 +1859,7 @@ input:focus, select:focus, textarea:focus {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
-.payroll-download:hover { border-color: var(--amber); color: var(--amber); }
+.payroll-download:hover { border-color: var(--amber); color: var(--amber-deep); }
 
 /* ─── Activity log ────────────────────────────────────────────────────── */
 .activity-filters-grid {
