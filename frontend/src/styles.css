@@ -1672,59 +1672,6 @@ input:focus, select:focus, textarea:focus {
 .login-page .theme-opt:hover { color: var(--ink); }
 .login-page .theme-opt.on { background: var(--glow); color: #062033; }
 
-.people-tabs-wrap { display: grid; gap: 8px; }
-.people-tabs-label {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--mist);
-}
-.people-tabs {
-  display: grid;
-  gap: 12px;
-  max-height: 220px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.people-group { display: grid; gap: 6px; }
-.people-group-label {
-  margin: 0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--mist);
-  opacity: 0.85;
-}
-.people-group-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.person-tab {
-  appearance: none;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  min-height: 28px;
-  padding: 5px 11px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--mist);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.1;
-  text-align: left;
-  cursor: pointer;
-}
-.person-tab-name { font-weight: 700; }
-.person-tab-role { font-size: 10px; font-weight: 500; opacity: 0.75; }
-.person-tab:hover { color: var(--ink); border-color: rgba(126, 200, 234, 0.5); }
-.person-tab.selected { border-color: transparent; background: var(--glow); color: #062033; }
 .password-field {
   display: grid;
   grid-template-columns: 1fr auto;
