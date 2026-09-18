@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ASSIGNABLE_ROLES, PERMISSIONS, ROLES, ROLE_LABELS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
+import { useToast } from "../toast.jsx";
 
 function fmtTime(iso) {
   if (!iso) return null;
@@ -85,6 +86,7 @@ const REPORTS_TO_TOP = "__top__";
 
 export function EmployeesPage() {
   const { can } = useAuth();
+  const { notify } = useToast();
   const canManage = can(PERMISSIONS.EMPLOYEE_WRITE_COMPANY);
   const [rows, setRows] = useState([]);
   const [attendance, setAttendance] = useState([]);
@@ -98,6 +100,10 @@ export function EmployeesPage() {
   const [createError, setCreateError] = useState("");
   const [notice, setNotice] = useState("");
   const [removingId, setRemovingId] = useState("");
+  const [restoringId, setRestoringId] = useState("");
+  // Removed people are deactivated rather than erased when they still have
+  // records, so they're out of the directory until this is switched on.
+  const [showFormer, setShowFormer] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [leaveRows, setLeaveRows] = useState([]);
   const [lopFor, setLopFor] = useState(null);
@@ -110,8 +116,9 @@ export function EmployeesPage() {
   const [attendanceFor, setAttendanceFor] = useState(null);
   const [attMonth, setAttMonth] = useState(currentMonthKey);
 
-  async function load() {
-    const jobs = [api("/api/v1/employees?pageSize=100"), api("/api/v1/attendance/all")];
+  async function load({ includeInactive = showFormer } = {}) {
+    const people = `/api/v1/employees?pageSize=100${includeInactive ? "&includeInactive=1" : ""}`;
+    const jobs = [api(people), api("/api/v1/attendance/all")];
     if (canManage) {
       jobs.push(
         api("/api/v1/employees/departments"),
@@ -388,18 +395,38 @@ export function EmployeesPage() {
   }
 
   async function removeEmployee(emp) {
-    if (!window.confirm(`Remove ${emp.legalName} (${emp.employeeNumber})? This deletes their login and can't be undone.`)) {
-      return;
-    }
+    const ok = window.confirm(
+      `Remove ${emp.legalName} (${emp.employeeNumber})? They lose access and leave the directory. If they have records here — leave, attendance, payroll, or people reporting to them — those are kept and they're deactivated instead of erased.`,
+    );
+    if (!ok) return;
     setError("");
     setRemovingId(emp.id);
     try {
-      await api(`/api/v1/employees/${emp.id}`, { method: "DELETE" });
+      const res = await api(`/api/v1/employees/${emp.id}`, { method: "DELETE" });
+      notify(
+        res?.data?.outcome === "deactivated"
+          ? `${emp.legalName} deactivated — login off, records kept`
+          : `${emp.legalName} removed`,
+        "success",
+      );
       await load();
     } catch (err) {
-      setError(err.message);
+      notify(`Couldn't remove ${emp.legalName}: ${err.message}`, "error");
     } finally {
       setRemovingId("");
+    }
+  }
+
+  async function restoreEmployee(emp) {
+    setRestoringId(emp.id);
+    try {
+      await api(`/api/v1/employees/${emp.id}/restore`, { method: "POST" });
+      notify(`${emp.legalName} restored to the directory`, "success");
+      await load();
+    } catch (err) {
+      notify(`Couldn't restore ${emp.legalName}: ${err.message}`, "error");
+    } finally {
+      setRestoringId("");
     }
   }
 
@@ -427,7 +454,7 @@ export function EmployeesPage() {
           <p className="page-sub">
             {loading
               ? "Loading…"
-              : `${total ?? rows.length} on the team · today's clock in/out`}
+              : `${total ?? rows.length} ${showFormer ? "in the directory" : "on the team"} · today's clock in/out`}
           </p>
         </div>
       </div>
@@ -657,6 +684,22 @@ export function EmployeesPage() {
       <div className="card table-card">
         <div className="table-head">
           <h2>Directory &amp; attendance</h2>
+          <span className="spacer" />
+          {canManage ? (
+            <label className="muted" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={showFormer}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setShowFormer(next);
+                  setError("");
+                  load({ includeInactive: next }).catch((err) => setError(err.message));
+                }}
+              />
+              Show former employees
+            </label>
+          ) : null}
         </div>
         <div className="table-wrap">
           <table>
@@ -690,6 +733,7 @@ export function EmployeesPage() {
                 rows.map((e) => {
                   const a = attByEmp.get(e.id);
                   const isToday = a?.day === today;
+                  const former = e.employmentStatus === "inactive";
                   const opened = a?.clockInAt != null && !a.clockOutAt;
                   const closedToday = a?.clockOutAt != null && isToday;
                   // Status reflects today: only actual open/closes today matter.
@@ -728,7 +772,9 @@ export function EmployeesPage() {
                           ) : "—"}
                       </td>
                       <td>
-                        {canManage ? (
+                        {former ? (
+                          <span className="employment-pill terminated">Former</span>
+                        ) : canManage ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span className={lopByEmployee.get(e.id) ? "employment-pill absent" : "muted"}>
                               {lopByEmployee.get(e.id) ? `${lopByEmployee.get(e.id)} day${lopByEmployee.get(e.id) === 1 ? "" : "s"}` : "—"}
@@ -757,23 +803,34 @@ export function EmployeesPage() {
                       </td>
                       {canManage ? (
                         <td>
-                          <div style={{ display: "flex", gap: 8 }}>
+                          {former ? (
                             <button
                               className="btn btn-ghost"
                               type="button"
-                              onClick={() => startEdit(e)}
+                              disabled={restoringId === e.id}
+                              onClick={() => restoreEmployee(e)}
                             >
-                              Edit
+                              {restoringId === e.id ? "…" : "Restore"}
                             </button>
-                            <button
-                              className="btn btn-ghost"
-                              type="button"
-                              disabled={removingId === e.id}
-                              onClick={() => removeEmployee(e)}
-                            >
-                              {removingId === e.id ? "…" : "Remove"}
-                            </button>
-                          </div>
+                          ) : (
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button
+                                className="btn btn-ghost"
+                                type="button"
+                                onClick={() => startEdit(e)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="btn btn-ghost"
+                                type="button"
+                                disabled={removingId === e.id}
+                                onClick={() => removeEmployee(e)}
+                              >
+                                {removingId === e.id ? "…" : "Remove"}
+                              </button>
+                            </div>
+                          )}
                         </td>
                       ) : null}
                     </tr>

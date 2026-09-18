@@ -56,7 +56,8 @@ export async function computeStatusById(store, employees) {
 
 export async function getOrgChart() {
   const store = getStore();
-  const employees = await store.listEmployees();
+  // Former employees are off the chart, same as they're out of the directory.
+  const employees = (await store.listEmployees()).filter((e) => e.employmentStatus !== "inactive");
   const usersById = new Map();
   await Promise.all(
     employees.map(async (e) => {

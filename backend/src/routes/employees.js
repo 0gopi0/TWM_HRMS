@@ -36,8 +36,16 @@ employeesRouter.get("/org", authorize(PERMISSIONS.EMPLOYEE_READ_SELF), async (re
 employeesRouter.get("/", authorize(PERMISSIONS.EMPLOYEE_READ_SELF), async (req, res, next) => {
   try {
     const { page, pageSize, offset } = parsePagination(req.query);
+    // People who were removed are deactivated rather than erased (see
+    // employeeService.deleteEmployee), so they're kept out of the directory
+    // entirely unless asked for — payroll passes includeInactive=1 to still
+    // resolve a name against their old payslips, and the People page uses it
+    // for the "former employees" view.
+    const includeInactive = ["1", "true"].includes(String(req.query.includeInactive));
     const all = await getStore().listEmployees();
-    const visible = all.filter((e) => canSeeEmployee(req.employee, req.user.role, e));
+    const visible = all
+      .filter((e) => includeInactive || e.employmentStatus !== "inactive")
+      .filter((e) => canSeeEmployee(req.employee, req.user.role, e));
     let slice = visible.slice(offset, offset + pageSize);
     // Email is only needed for the edit-employee form; don't hand every
     // coworker's login email to whoever can merely see the directory.
@@ -152,13 +160,35 @@ employeesRouter.delete(
   validate({ params: z.object({ id: z.string().min(1) }) }),
   async (req, res, next) => {
     try {
-      await employeeService.deleteEmployee({
+      const { outcome } = await employeeService.deleteEmployee({
         actorUser: req.user,
         id: req.params.id,
         requestId: req.requestId,
         ip: req.ip,
       });
-      res.status(204).end();
+      // "deleted" is a real erasure, "deactivated" means records were kept —
+      // the caller says which to the person doing the removing.
+      res.json({ data: { outcome } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Brings back someone who was removed while they still had records.
+employeesRouter.post(
+  "/:id/restore",
+  authorize(PERMISSIONS.EMPLOYEE_WRITE_COMPANY),
+  validate({ params: z.object({ id: z.string().min(1) }) }),
+  async (req, res, next) => {
+    try {
+      const restored = await employeeService.restoreEmployee({
+        actorUser: req.user,
+        id: req.params.id,
+        requestId: req.requestId,
+        ip: req.ip,
+      });
+      res.json({ data: restored });
     } catch (err) {
       next(err);
     }

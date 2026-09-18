@@ -127,14 +127,27 @@ export async function createMemoryStore() {
       Object.assign(emp, updates);
       return emp;
     },
+    // Mirrors the foreign keys MySQL enforces on employees/users, so the
+    // fallback store refuses the same hard deletes the real database would —
+    // otherwise a person with history would be erased here and deactivated
+    // in production.
     async deleteEmployee(id) {
       const emp = employees.get(id);
       if (!emp) return false;
-      const referenced = [...employees.values()].some(
-        (e) => e.id !== id && (e.managerId === id || e.leaveApproverId === id),
-      );
+      const referenced =
+        [...employees.values()].some((e) => e.id !== id && (e.managerId === id || e.leaveApproverId === id)) ||
+        teams.some((t) => t.leaderEmployeeId === id) ||
+        leaveRequests.some((r) => r.employeeId === id || r.approverEmployeeId === id) ||
+        leaveEntitlements.some((l) => l.employeeId === id) ||
+        attendance.some((a) => a.employeeId === id) ||
+        salaries.some((s) => s.employeeId === id) ||
+        payslips.some((p) => p.employeeId === id) ||
+        (emp.userId != null &&
+          (leaveApprovals.some((a) => a.actorUserId === emp.userId) ||
+            payslips.some((p) => p.createdBy === emp.userId) ||
+            paymentRuns.some((r) => r.createdBy === emp.userId)));
       if (referenced) {
-        const e = new Error("This person is referenced elsewhere (a manager, team lead, or leave approver) and can't be deleted");
+        const e = new Error("This person has related records and can't be deleted");
         e.code = "REFERENCED";
         throw e;
       }
@@ -147,6 +160,29 @@ export async function createMemoryStore() {
         users.delete(emp.userId);
         if (user) usersByEmail.delete(user.email);
       }
+      return true;
+    },
+    // Soft removal: every record stays, the login is switched off and any
+    // live session is revoked.
+    async deactivateEmployee(id) {
+      const emp = employees.get(id);
+      if (!emp) return false;
+      emp.employmentStatus = "inactive";
+      const user = emp.userId ? users.get(emp.userId) : null;
+      if (user) {
+        user.isActive = false;
+        for (const row of refreshTokens.values()) {
+          if (row.userId === user.id) row.revokedAt = new Date().toISOString();
+        }
+      }
+      return true;
+    },
+    async restoreEmployee(id) {
+      const emp = employees.get(id);
+      if (!emp) return false;
+      emp.employmentStatus = "active";
+      const user = emp.userId ? users.get(emp.userId) : null;
+      if (user) user.isActive = true;
       return true;
     },
     async listLeave() {

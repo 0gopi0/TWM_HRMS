@@ -248,33 +248,77 @@ export async function updateEmployee({
   return { ...existing, ...updates, email: emailChanged ? email : currentUser?.email };
 }
 
+// Removing someone whose records still point at them (their leave, attendance
+// and payslips, or a reporting line through them) would mean destroying that
+// history, so those people are deactivated instead: login off, out of the
+// directory, everything else left exactly as it was. Only a person with no
+// history at all is really erased.
 export async function deleteEmployee({ actorUser, id, requestId, ip }) {
   const store = getStore();
   const emp = await store.getEmployeeById(id);
   if (!emp) throw new HttpError(404, "Employee not found");
 
-  let deleted;
-  try {
-    deleted = await store.deleteEmployee(id);
-  } catch (err) {
-    if (err.code === "REFERENCED") throw new HttpError(409, err.message);
-    throw err;
+  const actor = await resolveActor(actorUser);
+  // Someone who can remove people could otherwise lock themselves out of the
+  // app with one click — there's no way back in to undo it.
+  if (actor.employeeId && actor.employeeId === id) {
+    throw new HttpError(422, "You can't remove your own account");
   }
-  if (!deleted) throw new HttpError(404, "Employee not found");
+
+  let outcome = "deleted";
+  try {
+    const deleted = await store.deleteEmployee(id);
+    if (!deleted) throw new HttpError(404, "Employee not found");
+  } catch (err) {
+    if (err.code !== "REFERENCED") throw err;
+    await store.deactivateEmployee(id);
+    outcome = "deactivated";
+  }
+
+  await store.writeAudit({
+    actorUserId: actorUser.id,
+    actorEmployeeId: actor.employeeId,
+    actorName: actor.name,
+    action: outcome === "deleted" ? "employee.delete" : "employee.deactivate",
+    entity: "employee",
+    entityId: id,
+    targetEmployeeId: id,
+    targetName: emp.legalName,
+    summary:
+      outcome === "deleted"
+        ? `${actor.name} removed ${emp.legalName} from the directory`
+        : `${actor.name} deactivated ${emp.legalName} — login disabled, records kept`,
+    beforeJson: { employeeNumber: emp.employeeNumber, legalName: emp.legalName },
+    requestId,
+    ip,
+  });
+  return { outcome };
+}
+
+// Undoes a deactivation: they are back in the directory and their login works
+// again. (Someone who was hard-deleted is gone for good — there's nothing to
+// restore.)
+export async function restoreEmployee({ actorUser, id, requestId, ip }) {
+  const store = getStore();
+  const emp = await store.getEmployeeById(id);
+  if (!emp) throw new HttpError(404, "Employee not found");
+
+  const restored = await store.restoreEmployee(id);
+  if (!restored) throw new HttpError(404, "Employee not found");
 
   const actor = await resolveActor(actorUser);
   await store.writeAudit({
     actorUserId: actorUser.id,
     actorEmployeeId: actor.employeeId,
     actorName: actor.name,
-    action: "employee.delete",
+    action: "employee.restore",
     entity: "employee",
     entityId: id,
     targetEmployeeId: id,
     targetName: emp.legalName,
-    summary: `${actor.name} removed ${emp.legalName} from the directory`,
-    beforeJson: { employeeNumber: emp.employeeNumber, legalName: emp.legalName },
+    summary: `${actor.name} restored ${emp.legalName} to the directory`,
     requestId,
     ip,
   });
+  return { ...emp, employmentStatus: "active" };
 }

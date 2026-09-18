@@ -82,7 +82,9 @@ export function PayrollPage() {
     const slips = await api("/api/v1/payroll/payslips");
     setRows(slips.data);
     if (isHr) {
-      const emps = await api("/api/v1/employees?pageSize=100");
+      // Former employees are included so their old payslips still show a name
+      // (and a final settlement can still be raised for them).
+      const emps = await api("/api/v1/employees?pageSize=100&includeInactive=1");
       setPeople(emps.data);
       const selectable = emps.data.filter((p) => !EXCLUDED_FROM_PAYROLL.has(p.id));
       if (!employeeId && selectable[0]) setEmployeeId(selectable[0].id);

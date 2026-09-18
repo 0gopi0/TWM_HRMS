@@ -298,6 +298,51 @@ export async function createMysqlStore() {
         conn.release();
       }
     },
+    // Soft removal for anyone a hard delete would erase history for: the
+    // employee record and every related row stay as they are, the login is
+    // switched off and any live session is revoked in the same transaction.
+    async deactivateEmployee(id) {
+      const emp = await this.getEmployeeById(id);
+      if (!emp) return false;
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query("UPDATE employees SET employment_status = 'inactive' WHERE id = ?", [id]);
+        if (emp.userId) {
+          await conn.query("UPDATE users SET is_active = 0 WHERE id = ?", [emp.userId]);
+          await conn.query(
+            "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL",
+            [emp.userId],
+          );
+        }
+        await conn.commit();
+        return true;
+      } catch (err) {
+        await conn.rollback();
+        throw err;
+      } finally {
+        conn.release();
+      }
+    },
+    async restoreEmployee(id) {
+      const emp = await this.getEmployeeById(id);
+      if (!emp) return false;
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query("UPDATE employees SET employment_status = 'active' WHERE id = ?", [id]);
+        if (emp.userId) {
+          await conn.query("UPDATE users SET is_active = 1 WHERE id = ?", [emp.userId]);
+        }
+        await conn.commit();
+        return true;
+      } catch (err) {
+        await conn.rollback();
+        throw err;
+      } finally {
+        conn.release();
+      }
+    },
     async listLeave() {
       const [rows] = await pool.query("SELECT * FROM leave_requests ORDER BY created_at DESC");
       return rows.map((r) => ({
