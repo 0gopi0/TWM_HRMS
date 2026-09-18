@@ -16,10 +16,15 @@ function nextEmployeeNumber(employees) {
   return `${EMPLOYEE_NUMBER_PREFIX}${max + 1}`;
 }
 
-// "Reports to" is a single choice: the leader of a specific team, or the top
-// of the org chart for someone with no team yet. Picking a team always fixes
-// who the manager is, so the two can't drift out of sync. Shared by create
-// and update so the rule can't diverge between the two paths.
+// "Reports to" is a single choice: a person (typically a team leader in the
+// same department), or the top of the org chart. Picking someone who leads a
+// team also joins that team, so the two can't drift out of sync.
+//
+// Reporting to someone with no team row of their own is allowed — a
+// department can have more than one lead, and only one of them is the leader
+// of the team the seeder created. The manager link carries the relationship
+// and team_id stays null; direct reports remain visible to them either way.
+// Shared by create and update so the rule can't diverge between the two paths.
 async function resolveReportsTo({ store, departmentId, teamId, managerId, selfId }) {
   let resolvedManagerId = null;
   if (teamId) {
@@ -36,9 +41,6 @@ async function resolveReportsTo({ store, departmentId, teamId, managerId, selfId
   } else if (managerId) {
     const manager = await store.getEmployeeById(managerId);
     if (!manager) throw new HttpError(422, "Manager not found");
-    if (manager.managerId) {
-      throw new HttpError(422, "Without a team, who they report to must be the top of the org chart");
-    }
     resolvedManagerId = managerId;
   }
   if (selfId && resolvedManagerId === selfId) {

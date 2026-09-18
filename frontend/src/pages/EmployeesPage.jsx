@@ -173,20 +173,28 @@ export function EmployeesPage() {
     [teams, form.departmentId],
   );
 
-  // "Reports to" collapses team + manager into one choice: picking a team
-  // leader also picks their team, so the two can never disagree.
+  // "Reports to" collapses team + manager into one choice. Two kinds of person
+  // qualify: whoever leads a team in this department (the seeded org has team
+  // leads whose role is HR or Admin, not "Team leader"), and anyone carrying
+  // the Team leader role here — a department can have more than one lead, and
+  // only one of them owns the team row. Picking someone who does lead a team
+  // also joins that team, so the two can't disagree.
   const reportsToOptions = useMemo(() => {
-    const leaders = teamsInDepartment
-      .filter((t) => t.leaderEmployeeId && byId[t.leaderEmployeeId] && t.leaderEmployeeId !== editingId)
-      .map((t) => ({
-        value: t.leaderEmployeeId,
-        label: `${byId[t.leaderEmployeeId].legalName} — ${t.name}`,
-      }));
+    const candidates = new Set(teamsInDepartment.map((t) => t.leaderEmployeeId).filter(Boolean));
+    for (const p of rows) {
+      if (p.departmentId === form.departmentId && p.role === ROLES.TEAM_LEADER) candidates.add(p.id);
+    }
+    const leaders = rows
+      .filter((p) => candidates.has(p.id) && p.id !== editingId)
+      .map((p) => {
+        const team = teamsInDepartment.find((t) => t.leaderEmployeeId === p.id);
+        return { value: p.id, label: team ? `${p.legalName} — ${team.name}` : p.legalName };
+      });
     if (orgTop && orgTop.id !== editingId) {
       leaders.push({ value: REPORTS_TO_TOP, label: `${orgTop.legalName} (top of the org, no team)` });
     }
     return leaders;
-  }, [teamsInDepartment, byId, orgTop, editingId]);
+  }, [rows, teamsInDepartment, form.departmentId, orgTop, editingId]);
 
   // Leave approver must be a team lead or above — a team member can't approve leave.
   const approverOptions = useMemo(
