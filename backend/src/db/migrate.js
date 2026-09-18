@@ -81,6 +81,12 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["010_activity_log"]);
   }
+  const [dm] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", ["011_digital_marketing"]);
+  if (dm.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/011_digital_marketing_department.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["011_digital_marketing"]);
+  }
   await conn.end();
 }
 
