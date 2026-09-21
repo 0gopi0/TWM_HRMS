@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LEAVE_TYPE_LABELS, ROLES } from "@twm/shared";
+import { AUTO_CLOCKOUT_HOUR, LEAVE_TYPE_LABELS, ROLES } from "@twm/shared";
 import { useAuth } from "../auth.jsx";
 import { api } from "../api.js";
 import { SparkIcon, LeaveTypeBadge, fmtDate, leaveTypeLabel } from "../ui.jsx";
@@ -7,6 +7,11 @@ import { SparkIcon, LeaveTypeBadge, fmtDate, leaveTypeLabel } from "../ui.jsx";
 function formatTime(value) {
   if (!value) return "—";
   return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function hourLabel(hour) {
+  const h12 = hour % 12 || 12;
+  return `${h12}:00 ${hour < 12 ? "AM" : "PM"}`;
 }
 
 function fmtDuration(mins) {
@@ -296,6 +301,9 @@ export function DashboardPage() {
               You're on approved leave today, so clock in is disabled. Half-day leave still allows clocking in/out.
             </p>
           ) : null}
+          <p className="muted" style={{ fontSize: 12, margin: "10px 0 0" }}>
+            Forgot to clock out? The system closes your day at {hourLabel(AUTO_CLOCKOUT_HOUR)}.
+          </p>
         </article>
 
         {/* Org-wide stats — owner / HR only */}

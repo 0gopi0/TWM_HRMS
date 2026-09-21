@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { HOLIDAY_KINDS } from "@twm/shared";
+import { AUTO_CLOCKOUT_HOUR, HOLIDAY_KINDS } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { asYmd, isOnFullDayLeave } from "./leaveService.js";
@@ -111,4 +111,47 @@ export async function clockOut(employee) {
     afterJson: { clockOutAt },
   });
   return getAttendanceStatus(employee);
+}
+
+// The instant an entry is auto-closed at: AUTO_CLOCKOUT_HOUR on the local day it
+// was opened. Someone who clocked in after that hour is closed out at their own
+// clock-in time instead, so the entry never runs backwards.
+function autoClockOutAt(clockInAt) {
+  const hour = String(AUTO_CLOCKOUT_HOUR).padStart(2, "0");
+  const cutoff = new Date(`${dayKey(clockInAt)}T${hour}:00:00`);
+  const clockedIn = new Date(clockInAt);
+  return cutoff < clockedIn ? clockedIn : cutoff;
+}
+
+// Closes out anyone still clocked in whose cutoff has passed — a forgotten
+// clock-out would otherwise leave them "Clocked in" for good on the dashboard,
+// the directory, and the org chart. Runs at AUTO_CLOCKOUT_HOUR and once at boot
+// (see index.js); the boot pass catches a restart that skipped the evening run.
+// Returns the entries it closed, so the caller can report them.
+export async function autoClockOutOpenEntries({ now = new Date() } = {}) {
+  const store = getStore();
+  const open = (await store.listAllAttendance()).filter((row) => !row.clockOutAt);
+  const closed = [];
+  for (const entry of open) {
+    try {
+      const clockOutAt = autoClockOutAt(entry.clockInAt);
+      // Today's cutoff hasn't arrived yet — they may still be working.
+      if (clockOutAt > now) continue;
+      const iso = clockOutAt.toISOString();
+      await store.closeAttendance(entry.id, iso);
+      await store.writeAudit({
+        actorUserId: null,
+        action: "attendance.auto_clock_out",
+        entity: "attendance_entry",
+        entityId: entry.id,
+        targetEmployeeId: entry.employeeId,
+        beforeJson: { clockInAt: entry.clockInAt },
+        afterJson: { clockOutAt: iso },
+      });
+      closed.push({ id: entry.id, employeeId: entry.employeeId, clockInAt: entry.clockInAt, clockOutAt: iso });
+    } catch (err) {
+      console.error(`Auto clock-out failed for attendance entry ${entry.id}:`, err);
+    }
+  }
+  return closed;
 }

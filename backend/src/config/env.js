@@ -15,6 +15,13 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const nodeEnvBeforeDotenv = process.env.NODE_ENV || "development";
 loadEnv({ path: resolve(root, ".env"), override: nodeEnvBeforeDotenv !== "production" });
 
+// The business day is IST: the attendance day, leave dates, the calendar month,
+// and the 10 PM auto clock-out all read the server's local clock. Pin the
+// process timezone here — before anything constructs a Date — so the host's own
+// clock can't shift those boundaries, and so mysql2 keeps writing and reading
+// DATETIME columns as IST wall-clock.
+process.env.TZ = "Asia/Kolkata";
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().default(() => (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1")),

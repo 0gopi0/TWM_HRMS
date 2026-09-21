@@ -138,6 +138,10 @@ export const LEAVE_ENTITLEMENTS = Object.freeze({
 
 export const LEAVE_ENTITLEMENT_LIST = Object.freeze(Object.keys(LEAVE_ENTITLEMENTS));
 
+// Anyone still clocked in is automatically clocked out at this hour, on the day
+// they clocked in. Local time — the app is pinned to IST (see config/env.js).
+export const AUTO_CLOCKOUT_HOUR = 22;
+
 export const DEMO_PASSWORD = "LocalDev!23";
 
 // Payslip creation and running payment are restricted to these two people
