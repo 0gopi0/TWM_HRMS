@@ -143,6 +143,7 @@ export async function updateEmployee({
   actorUser,
   id,
   legalName,
+  employeeNumber,
   email,
   jobTitle,
   role,
@@ -195,6 +196,7 @@ export async function updateEmployee({
 
   const updates = {
     legalName: legalName.trim(),
+    employeeNumber: employeeNumber.trim(),
     jobTitle: jobTitle?.trim() || null,
     departmentId,
     teamId: teamId || null,
@@ -209,11 +211,18 @@ export async function updateEmployee({
       throw err;
     }
   }
-  await store.updateEmployee(id, updates);
+  try {
+    await store.updateEmployee(id, updates);
+  } catch (err) {
+    if (err.code === "DUPLICATE_EMPLOYEE_NUMBER") throw new HttpError(409, err.message);
+    throw err;
+  }
   if (roleChanged) await store.updateUserRole(existing.userId, role);
 
   const actor = await resolveActor(actorUser);
+  const numberChanged = updates.employeeNumber !== existing.employeeNumber;
   const changedBits = [];
+  if (numberChanged) changedBits.push("ID number");
   if (roleChanged) changedBits.push(`role to ${role}`);
   if (emailChanged) changedBits.push("email");
   const summary = changedBits.length
@@ -231,6 +240,7 @@ export async function updateEmployee({
     summary,
     beforeJson: {
       legalName: existing.legalName,
+      employeeNumber: existing.employeeNumber,
       email: currentUser?.email,
       jobTitle: existing.jobTitle,
       departmentId: existing.departmentId,
@@ -250,11 +260,13 @@ export async function updateEmployee({
   return { ...existing, ...updates, email: emailChanged ? email : currentUser?.email };
 }
 
-// Removing someone whose records still point at them (their leave, attendance
-// and payslips, or a reporting line through them) would mean destroying that
-// history, so those people are deactivated instead: login off, out of the
-// directory, everything else left exactly as it was. Only a person with no
-// history at all is really erased.
+// Removing someone always erases their own HR data — leave requests and
+// balance, attendance, salary history, payslips — and clears any reporting
+// line, team lead or leave-approver reference that pointed at them (see
+// store.deleteEmployee). The employee row itself is deactivated instead of
+// deleted only when it can't be, because they acted on someone ELSE's
+// record (approved a teammate's leave, ran a payment run, issued a payslip)
+// and that action's audit trail isn't this person's data to remove.
 export async function deleteEmployee({ actorUser, id, requestId, ip }) {
   const store = getStore();
   const emp = await store.getEmployeeById(id);
@@ -289,7 +301,7 @@ export async function deleteEmployee({ actorUser, id, requestId, ip }) {
     summary:
       outcome === "deleted"
         ? `${actor.name} removed ${emp.legalName} from the directory`
-        : `${actor.name} deactivated ${emp.legalName} — login disabled, records kept`,
+        : `${actor.name} deactivated ${emp.legalName} — login disabled, their leave/attendance/pay records erased, approval history kept`,
     beforeJson: { employeeNumber: emp.employeeNumber, legalName: emp.legalName },
     requestId,
     ip,

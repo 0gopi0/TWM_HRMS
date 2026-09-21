@@ -124,38 +124,86 @@ export async function createMemoryStore() {
     async updateEmployee(id, updates) {
       const emp = employees.get(id);
       if (!emp) return null;
+      if (updates.employeeNumber && updates.employeeNumber.toLowerCase() !== emp.employeeNumber?.toLowerCase()) {
+        const dup = [...employees.values()].some(
+          (e) => e.id !== id && e.employeeNumber?.toLowerCase() === updates.employeeNumber.toLowerCase(),
+        );
+        if (dup) {
+          const e = new Error("That employee ID is already in use");
+          e.code = "DUPLICATE_EMPLOYEE_NUMBER";
+          throw e;
+        }
+      }
       Object.assign(emp, updates);
       return emp;
     },
-    // Mirrors the foreign keys MySQL enforces on employees/users, so the
-    // fallback store refuses the same hard deletes the real database would —
-    // otherwise a person with history would be erased here and deactivated
-    // in production.
+    // Mirrors the mysqlStore behavior: this person's own HR data (leave,
+    // balance, attendance, salary, payslips) is always deleted. References
+    // other people's records hold ON them (manager, team lead, designated
+    // leave approver, the approver on a teammate's leave) are cleared, not
+    // deleted, since that data belongs to the other person. Only when they
+    // acted ON someone else's record — approved a teammate's leave, ran a
+    // payment run, issued a payslip — is the employee row itself left in
+    // place (for the caller to deactivate instead), since that's an audit
+    // trail of an action, not this person's data.
     async deleteEmployee(id) {
       const emp = employees.get(id);
       if (!emp) return false;
-      const referenced =
-        [...employees.values()].some((e) => e.id !== id && (e.managerId === id || e.leaveApproverId === id)) ||
-        teams.some((t) => t.leaderEmployeeId === id) ||
-        leaveRequests.some((r) => r.employeeId === id || r.approverEmployeeId === id) ||
-        leaveEntitlements.some((l) => l.employeeId === id) ||
-        attendance.some((a) => a.employeeId === id) ||
-        salaries.some((s) => s.employeeId === id) ||
-        payslips.some((p) => p.employeeId === id) ||
-        (emp.userId != null &&
-          (leaveApprovals.some((a) => a.actorUserId === emp.userId) ||
-            payslips.some((p) => p.createdBy === emp.userId) ||
-            paymentRuns.some((r) => r.createdBy === emp.userId)));
-      if (referenced) {
-        const e = new Error("This person has related records and can't be deleted");
-        e.code = "REFERENCED";
-        throw e;
-      }
-      employees.delete(id);
+
       if (emp.userId) {
         for (const [key, row] of refreshTokens) {
           if (row.userId === emp.userId) refreshTokens.delete(key);
         }
+        for (const [key, row] of passwordResetTokens) {
+          if (row.userId === emp.userId) passwordResetTokens.delete(key);
+        }
+      }
+      const ownLeaveIds = new Set(leaveRequests.filter((r) => r.employeeId === id).map((r) => r.id));
+      for (let i = leaveApprovals.length - 1; i >= 0; i--) {
+        if (ownLeaveIds.has(leaveApprovals[i].leaveRequestId)) leaveApprovals.splice(i, 1);
+      }
+      for (let i = leaveRequests.length - 1; i >= 0; i--) {
+        if (leaveRequests[i].employeeId === id) leaveRequests.splice(i, 1);
+      }
+      for (let i = leaveEntitlements.length - 1; i >= 0; i--) {
+        if (leaveEntitlements[i].employeeId === id) leaveEntitlements.splice(i, 1);
+      }
+      for (let i = attendance.length - 1; i >= 0; i--) {
+        if (attendance[i].employeeId === id) attendance.splice(i, 1);
+      }
+      for (let i = salaries.length - 1; i >= 0; i--) {
+        if (salaries[i].employeeId === id) salaries.splice(i, 1);
+      }
+      for (let i = payslips.length - 1; i >= 0; i--) {
+        if (payslips[i].employeeId === id) payslips.splice(i, 1);
+      }
+
+      for (const e of employees.values()) {
+        if (e.managerId === id) e.managerId = null;
+        if (e.leaveApproverId === id) e.leaveApproverId = null;
+      }
+      for (const t of teams) {
+        if (t.leaderEmployeeId === id) t.leaderEmployeeId = null;
+      }
+      for (const r of leaveRequests) {
+        if (r.approverEmployeeId === id) r.approverEmployeeId = null;
+      }
+
+      const actedOnOthers =
+        emp.userId != null &&
+        (leaveApprovals.some((a) => a.actorUserId === emp.userId) ||
+          payslips.some((p) => p.createdBy === emp.userId) ||
+          paymentRuns.some((r) => r.createdBy === emp.userId));
+      if (actedOnOthers) {
+        const e = new Error(
+          "This person approved someone else's leave, ran a payroll payment, or issued a payslip, so they can't be fully erased — deactivating instead",
+        );
+        e.code = "REFERENCED";
+        throw e;
+      }
+
+      employees.delete(id);
+      if (emp.userId) {
         const user = users.get(emp.userId);
         users.delete(emp.userId);
         if (user) usersByEmail.delete(user.email);

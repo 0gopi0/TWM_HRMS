@@ -93,6 +93,14 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["012_leave_entitlement_half_days"]);
   }
+  const [cln] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", [
+    "013_cleanup_deactivated_employee_data",
+  ]);
+  if (cln.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/013_cleanup_deactivated_employee_data.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["013_cleanup_deactivated_employee_data"]);
+  }
   await conn.end();
 }
 

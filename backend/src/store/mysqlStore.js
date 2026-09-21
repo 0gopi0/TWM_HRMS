@@ -261,34 +261,96 @@ export async function createMysqlStore() {
       }
       return { ...employee, employmentStatus: "active" };
     },
-    async updateEmployee(id, { legalName, jobTitle, departmentId, teamId, managerId, leaveApproverId }) {
-      await pool.query(
-        `UPDATE employees
-         SET legal_name = ?, job_title = ?, department_id = ?, team_id = ?, manager_id = ?, leave_approver_id = ?
-         WHERE id = ?`,
-        [legalName, jobTitle || null, departmentId, teamId || null, managerId || null, leaveApproverId || null, id],
-      );
+    async updateEmployee(id, { legalName, employeeNumber, jobTitle, departmentId, teamId, managerId, leaveApproverId }) {
+      try {
+        await pool.query(
+          `UPDATE employees
+           SET legal_name = ?, employee_number = ?, job_title = ?, department_id = ?, team_id = ?, manager_id = ?, leave_approver_id = ?
+           WHERE id = ?`,
+          [
+            legalName,
+            employeeNumber,
+            jobTitle || null,
+            departmentId,
+            teamId || null,
+            managerId || null,
+            leaveApproverId || null,
+            id,
+          ],
+        );
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          const e = new Error("That employee ID is already in use");
+          e.code = "DUPLICATE_EMPLOYEE_NUMBER";
+          throw e;
+        }
+        throw err;
+      }
     },
+    // Removing someone deletes their own HR data outright — leave requests
+    // and balance, attendance, salary history and payslips — so none of it
+    // lingers (and shows up, e.g., in the Leave page's balance list) once
+    // they're gone. References other people's records hold ON them (manager,
+    // team lead, designated leave approver, the approver on a teammate's
+    // leave request) are cleared rather than deleted, since that data
+    // belongs to the other person, not this one.
     async deleteEmployee(id) {
       const emp = await this.getEmployeeById(id);
       if (!emp) return false;
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
-        await conn.query("DELETE FROM employees WHERE id = ?", [id]);
+
         if (emp.userId) {
-          // Session artifacts, not business history — always safe to drop
-          // so a stray login doesn't block deleting a mistaken hire.
+          // Session artifacts, not business history — always safe to drop.
           await conn.query("DELETE FROM refresh_tokens WHERE user_id = ?", [emp.userId]);
-          await conn.query("DELETE FROM users WHERE id = ?", [emp.userId]);
+          await conn.query("DELETE FROM password_reset_tokens WHERE user_id = ?", [emp.userId]);
         }
+
+        const [ownLeave] = await conn.query("SELECT id FROM leave_requests WHERE employee_id = ?", [id]);
+        if (ownLeave.length) {
+          await conn.query("DELETE FROM leave_approvals WHERE leave_request_id IN (?)", [
+            ownLeave.map((r) => r.id),
+          ]);
+          await conn.query("DELETE FROM leave_requests WHERE employee_id = ?", [id]);
+        }
+        await conn.query("DELETE FROM leave_entitlements WHERE employee_id = ?", [id]);
+        await conn.query("DELETE FROM attendance_entries WHERE employee_id = ?", [id]);
+        await conn.query("DELETE FROM salary_structures WHERE employee_id = ?", [id]);
+        await conn.query("DELETE FROM payslips WHERE employee_id = ?", [id]);
+
+        await conn.query("UPDATE employees SET manager_id = NULL WHERE manager_id = ?", [id]);
+        await conn.query("UPDATE employees SET leave_approver_id = NULL WHERE leave_approver_id = ?", [id]);
+        await conn.query("UPDATE teams SET leader_employee_id = NULL WHERE leader_employee_id = ?", [id]);
+        await conn.query("UPDATE leave_requests SET approver_employee_id = NULL WHERE approver_employee_id = ?", [
+          id,
+        ]);
+
+        await conn.commit();
+      } catch (err) {
+        await conn.rollback();
+        conn.release();
+        throw err;
+      }
+
+      // Their own data is gone. Now try to erase the person outright — this
+      // can still be blocked if they acted ON someone else's record (approved
+      // a teammate's leave, ran a payment run, issued a payslip): those rows
+      // keep a NOT NULL pointer to them as the audit trail of that action,
+      // which isn't this person's data to delete. When that happens they're
+      // deactivated instead, same as before, just with nothing of their own
+      // left behind.
+      try {
+        await conn.beginTransaction();
+        await conn.query("DELETE FROM employees WHERE id = ?", [id]);
+        if (emp.userId) await conn.query("DELETE FROM users WHERE id = ?", [emp.userId]);
         await conn.commit();
         return true;
       } catch (err) {
         await conn.rollback();
         if (err.code === "ER_ROW_IS_REFERENCED_2" || err.code === "ER_ROW_IS_REFERENCED") {
           const e = new Error(
-            "This person has related records (leave, attendance, payroll, audit history, or they're set as someone's manager/lead/approver) and can't be deleted",
+            "This person approved someone else's leave, ran a payroll payment, or issued a payslip, so they can't be fully erased — deactivating instead",
           );
           e.code = "REFERENCED";
           throw e;

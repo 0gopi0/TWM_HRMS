@@ -129,6 +129,7 @@ employeesRouter.patch(
     params: z.object({ id: z.string().min(1) }),
     body: z.object({
       legalName: z.string().trim().min(1).max(255),
+      employeeNumber: z.string().trim().min(1).max(32),
       email: z.string().trim().toLowerCase().email().optional(),
       jobTitle: z.string().trim().max(128).optional(),
       role: z.enum(ASSIGNABLE_ROLES).optional(),

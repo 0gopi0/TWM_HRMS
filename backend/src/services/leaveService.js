@@ -139,7 +139,11 @@ function quotaFromRows(rows) {
 
 export async function listEntitlements(year) {
   const store = getStore();
-  const employees = await store.listEmployees();
+  // Someone who's been removed shouldn't reappear here with a default
+  // allotment — deleting them clears their own entitlement rows, but the
+  // employee record itself may stick around deactivated (see
+  // employeeService.deleteEmployee), so filter them out explicitly too.
+  const employees = (await store.listEmployees()).filter((e) => e.employmentStatus !== "inactive");
   const rows = await store.listEntitlements(year);
   return employees.map((employee) => ({
     employeeId: employee.id,

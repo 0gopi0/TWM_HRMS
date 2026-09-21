@@ -69,6 +69,7 @@ function emptyLopForm() {
 function emptyForm() {
   return {
     legalName: "",
+    employeeNumber: "",
     email: "",
     password: "",
     jobTitle: "",
@@ -327,6 +328,7 @@ export function EmployeesPage() {
     setForm({
       ...emptyForm(),
       legalName: emp.legalName || "",
+      employeeNumber: emp.employeeNumber || "",
       email: emp.email || "",
       jobTitle: emp.jobTitle || "",
       role: emp.role || "team_member",
@@ -382,7 +384,7 @@ export function EmployeesPage() {
       if (editingId) {
         await api(`/api/v1/employees/${editingId}`, {
           method: "PATCH",
-          body: JSON.stringify({ ...payload, email: form.email.trim() }),
+          body: JSON.stringify({ ...payload, employeeNumber: form.employeeNumber.trim(), email: form.email.trim() }),
         });
         setNotice("Employee updated.");
       } else {
@@ -404,7 +406,7 @@ export function EmployeesPage() {
 
   async function removeEmployee(emp) {
     const ok = window.confirm(
-      `Remove ${emp.legalName} (${emp.employeeNumber})? They lose access and leave the directory. If they have records here — leave, attendance, payroll, or people reporting to them — those are kept and they're deactivated instead of erased.`,
+      `Remove ${emp.legalName} (${emp.employeeNumber})? This deletes their leave requests and balance, attendance, salary and payslip history for good, and clears them as anyone's manager, team lead or leave approver. If they approved someone else's leave or processed payroll, that audit trail is kept and they're deactivated instead of erased.`,
     );
     if (!ok) return;
     setError("");
@@ -413,7 +415,7 @@ export function EmployeesPage() {
       const res = await api(`/api/v1/employees/${emp.id}`, { method: "DELETE" });
       notify(
         res?.data?.outcome === "deactivated"
-          ? `${emp.legalName} deactivated — login off, records kept`
+          ? `${emp.legalName} deactivated — login off, their leave/attendance/pay records erased`
           : `${emp.legalName} removed`,
         "success",
       );
@@ -505,6 +507,16 @@ export function EmployeesPage() {
                 required
               />
             </label>
+            {editingId ? (
+              <label>
+                Employee ID
+                <input
+                  value={form.employeeNumber}
+                  onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })}
+                  required
+                />
+              </label>
+            ) : null}
             <label>
               Job title
               <input
