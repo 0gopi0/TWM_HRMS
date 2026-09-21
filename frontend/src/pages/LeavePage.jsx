@@ -370,6 +370,7 @@ export function LeavePage() {
                   type="number"
                   min="0"
                   max="365"
+                  step="0.5"
                   value={quota.casual}
                   onChange={(e) => setQuota({ ...quota, casual: e.target.value })}
                   required
@@ -381,6 +382,7 @@ export function LeavePage() {
                   type="number"
                   min="0"
                   max="365"
+                  step="0.5"
                   value={quota.paid}
                   onChange={(e) => setQuota({ ...quota, paid: e.target.value })}
                   required

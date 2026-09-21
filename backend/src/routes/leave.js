@@ -12,6 +12,14 @@ import { assertCanSeeEmployee } from "../services/scope.js";
 
 const leaveTypeSchema = z.enum(["sick", "casual", "unpaid"]);
 
+// Leave is consumed in whole or half-day increments (see daysConsumed in
+// leaveService.js), so entitlements are kept to the same 0.5-day granularity.
+const entitlementDays = z.coerce
+  .number()
+  .min(0)
+  .max(365)
+  .refine((n) => Math.round(n * 2) === n * 2, "Must be a whole or half number of days");
+
 const leaveBody = z.object({
   leaveType: leaveTypeSchema,
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -101,9 +109,9 @@ leaveRouter.put(
     body: z.object({
       employeeId: z.string().min(1),
       year: z.coerce.number().int().min(2000).max(2100).optional(),
-      casual: z.coerce.number().int().min(0).max(365),
-      paid: z.coerce.number().int().min(0).max(365),
-      unpaid: z.coerce.number().int().min(0).max(365).optional(),
+      casual: entitlementDays,
+      paid: entitlementDays,
+      unpaid: entitlementDays.optional(),
     }),
   }),
   async (req, res, next) => {
