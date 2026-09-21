@@ -77,9 +77,9 @@ function emptyQuota(employeeId = "") {
   return { employeeId, casual: 12, paid: 12 };
 }
 
-// Owners/co-founders aren't part of leave allotment management (same
-// exclusion as payroll — top of the house doesn't get a leave quota).
-const EXCLUDED_FROM_LEAVE_MANAGEMENT = new Set(["emp-manoj", "emp-chai"]);
+// The owner (Manoj, CMO & Co-Founder) is part of leave allotment management like
+// everyone else; only the CEO (Chai) stays out, matching payroll's exclusion.
+const EXCLUDED_FROM_LEAVE_MANAGEMENT = new Set(["emp-chai"]);
 
 export function LeavePage() {
   const { can, user } = useAuth();

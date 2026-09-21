@@ -1,5 +1,5 @@
 import { Link, Navigate, Route, Routes } from "react-router-dom";
-import { PERMISSIONS, ROLES } from "@twm/shared";
+import { PERMISSIONS } from "@twm/shared";
 import { useAuth } from "./auth.jsx";
 import { AppShell } from "./AppShell.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
@@ -36,15 +36,6 @@ function Guard({ children }) {
   return children;
 }
 
-// The owner sits at the top of the reporting line and has no one to apply
-// leave to, so the Leave page (nav link is already hidden) isn't reachable
-// by URL either.
-function LeaveRoute() {
-  const { user } = useAuth();
-  if (user?.role === ROLES.OWNER) return <Navigate to="/" replace />;
-  return <LeavePage />;
-}
-
 // People (clock in/out overview) is restricted to HR/admin/owner.
 function EmployeesRoute() {
   const { can } = useAuth();
@@ -77,7 +68,7 @@ export function App() {
         <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="employees" element={<EmployeesRoute />} />
         <Route path="org" element={<OrgPage />} />
-        <Route path="leave" element={<LeaveRoute />} />
+        <Route path="leave" element={<LeavePage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="payroll" element={<PayrollPage />} />
         <Route path="activity" element={<ActivityLogRoute />} />

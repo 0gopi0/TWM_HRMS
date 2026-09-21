@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { labelForRole, PERMISSIONS, ROLES } from "@twm/shared";
+import { labelForRole, PERMISSIONS } from "@twm/shared";
 import { useAuth } from "./auth.jsx";
 import { SignOutButton, ThemeSwitch } from "./ThemeSwitch.jsx";
 
@@ -67,8 +67,7 @@ const Icons = {
 /* ─── Navigation definitions ──────────────────────────────────────────── */
 const TOP_NAV = [
   { to: "/", label: "Dashboard", icon: "dashboard", end: true, perm: null },
-  // The top of the org (owner) doesn't request leave, so hide the Leave nav for them.
-  { to: "/leave", label: "Leave", icon: "leave", perm: PERMISSIONS.LEAVE_READ_SELF, hideForOwner: true },
+  { to: "/leave", label: "Leave", icon: "leave", perm: PERMISSIONS.LEAVE_READ_SELF },
   { to: "/approvals", label: "Approvals", icon: "approvals", perm: PERMISSIONS.LEAVE_APPROVE_TEAM },
   // People (everyone's directory, attendance, and LOP) is HR/owner only —
   // not the generic Admin Access role.
@@ -79,12 +78,6 @@ const TOP_NAV = [
   // Who did what, to whom — HR/owner only.
   { to: "/activity", label: "Activity Log", icon: "activity", perm: PERMISSIONS.AUDIT_READ_COMPANY },
 ];
-
-function navAllowed(can, item, isOwner) {
-  if (item.hideForOwner && isOwner) return false;
-  if (!item.perm) return true;
-  return can(item.perm);
-}
 
 export function AppShell() {
   const { user, can, logout } = useAuth();
@@ -106,8 +99,7 @@ export function AppShell() {
     .slice(0, 2)
     .toUpperCase();
 
-  const isOwner = user?.role === ROLES.OWNER;
-  const visibleNav = TOP_NAV.filter((l) => navAllowed(can, l, isOwner));
+  const visibleNav = TOP_NAV.filter((l) => !l.perm || can(l.perm));
 
   return (
     <div className="app-shell">
