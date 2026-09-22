@@ -3,6 +3,7 @@ import { LEAVE_ENTITLEMENT_LIST, LEAVE_ENTITLEMENTS, LEAVE_NOTICE_DAYS, LEAVE_TY
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { resolveActor } from "../utils/activityLog.js";
+import { notifyLeaveApplied, notifyLeaveDecided } from "./leaveNotifyService.js";
 
 // Leave approval is single-level: the applicant's designated approver
 // (direct manager, or the sales-team override to the owner) makes the
@@ -236,7 +237,17 @@ export async function createLeaveRequest({ employee, leaveType, startDate, endDa
     status: "pending",
     approverEmployeeId: approverId,
   };
-  return store.createLeave(row);
+  const created = await store.createLeave(row);
+  await notifyLeaveApplied({
+    applicantName: employee.legalName,
+    approverId,
+    leaveType,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    halfDay: row.halfDay,
+    reason,
+  });
+  return created;
 }
 
 export async function createManagedLeave({ actor, employeeId, leaveType, startDate, endDate, reason, status, halfDay = false }) {
@@ -405,6 +416,17 @@ export async function decideLeave({ user, leaveId, decision, comment }) {
     summary: `${actorName} ${decision} ${targetName}'s ${LEAVE_TYPE_LABELS[req.leaveType] || req.leaveType} request`,
     beforeJson: { status: req.status, approverEmployeeId: req.approverEmployeeId },
     afterJson: { status: nextStatus.status, approverEmployeeId: null },
+  });
+  await notifyLeaveDecided({
+    applicantUserId: targetEmployee?.userId,
+    applicantName: targetName,
+    decision,
+    decidedBy: actorName,
+    leaveType: req.leaveType,
+    startDate: asYmd(req.startDate),
+    endDate: asYmd(req.endDate),
+    halfDay: Boolean(req.halfDay),
+    comment,
   });
   return { leave: updated, approval };
 }
