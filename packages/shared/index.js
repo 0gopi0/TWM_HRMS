@@ -27,6 +27,7 @@ export const PERMISSIONS = Object.freeze({
   USER_PROVISION_COMPANY: "user:provision:company",
   AUDIT_READ_COMPANY: "audit:read:company",
   ATTENDANCE_CLOCK_SELF: "attendance:clock:self",
+  ATTENDANCE_CLOCK_TEAM: "attendance:clock:team",
 });
 
 const ALL = Object.values(PERMISSIONS);
@@ -39,11 +40,15 @@ const MEMBER = [
   PERMISSIONS.ATTENDANCE_CLOCK_SELF,
 ];
 
+// Clocking a team member in for a missed morning swipe — team leads and
+// everyone above them; a plain team member never gets to act on someone
+// else's attendance.
 const LEADER = [
   ...MEMBER,
   PERMISSIONS.EMPLOYEE_READ_TEAM,
   PERMISSIONS.LEAVE_READ_TEAM,
   PERMISSIONS.LEAVE_APPROVE_TEAM,
+  PERMISSIONS.ATTENDANCE_CLOCK_TEAM,
 ];
 
 const MANAGER = [

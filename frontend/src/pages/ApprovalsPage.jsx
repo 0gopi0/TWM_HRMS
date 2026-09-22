@@ -1,19 +1,48 @@
 import { useEffect, useState } from "react";
-import { LEAVE_TYPE_LABELS } from "@twm/shared";
+import { LEAVE_TYPE_LABELS, PERMISSIONS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
 
+function formatTime(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function nowHHmm() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function teamStatusLabel(row) {
+  if (row.dayOff) return row.dayOff.label ? `Day off · ${row.dayOff.label}` : "Day off";
+  if (row.onLeaveToday) return "On leave today";
+  if (row.clockedIn) return `Clocked in @ ${formatTime(row.clockInAt)}`;
+  if (row.completeForToday) return `Clocked out @ ${formatTime(row.clockOutAt)}`;
+  return "Not clocked in";
+}
+
 export function ApprovalsPage() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [rejecting, setRejecting] = useState(null); // { id, reason }
   const [busyId, setBusyId] = useState(null);
 
+  const canClockTeam = can(PERMISSIONS.ATTENDANCE_CLOCK_TEAM);
+  const [team, setTeam] = useState([]);
+  const [teamLoading, setTeamLoading] = useState(true);
+  const [clockingId, setClockingId] = useState(null);
+  const [timeDrafts, setTimeDrafts] = useState({});
+
   async function load() {
     const r = await api("/api/v1/leave?pageSize=100");
     setRows(r.data || []);
+  }
+
+  async function loadTeam() {
+    const r = await api("/api/v1/attendance/team");
+    setTeam(r.data || []);
   }
 
   useEffect(() => {
@@ -21,6 +50,35 @@ export function ApprovalsPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!canClockTeam) {
+      setTeamLoading(false);
+      return;
+    }
+    loadTeam()
+      .catch((e) => setError(e.message))
+      .finally(() => setTeamLoading(false));
+  }, [canClockTeam]);
+
+  async function clockInFor(employeeId) {
+    const time = timeDrafts[employeeId] || nowHHmm();
+    setError("");
+    setClockingId(employeeId);
+    try {
+      await api(`/api/v1/attendance/${employeeId}/clock-in-for`, {
+        method: "POST",
+        body: JSON.stringify({ clockInTime: time }),
+      });
+      await loadTeam();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setClockingId(null);
+    }
+  }
+
+  const teamRows = team.filter((row) => row.employeeId !== user?.employee?.id);
 
   const approvals = rows.filter(
     (row) => row.status?.startsWith("pending") && row.approverEmployeeId === user?.employee?.id,
@@ -142,6 +200,64 @@ export function ApprovalsPage() {
           </div>
         )}
       </div>
+      {canClockTeam ? (
+        <div className="card table-card">
+          <div className="table-head">
+            <h2>Team attendance</h2>
+          </div>
+          {teamLoading ? (
+            <p className="muted" style={{ padding: "24px 22px" }}>Loading…</p>
+          ) : teamRows.length === 0 ? (
+            <p className="muted" style={{ padding: "24px 22px" }}>No team members to show.</p>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Person</th>
+                    <th>Status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamRows.map((row) => {
+                    const canClockIn =
+                      !row.clockedIn && !row.completeForToday && !row.onLeaveToday && !row.dayOff;
+                    return (
+                      <tr key={row.employeeId}>
+                        <td><strong>{row.employeeName}</strong></td>
+                        <td>{teamStatusLabel(row)}</td>
+                        <td className="row-actions">
+                          {canClockIn ? (
+                            <>
+                              <input
+                                type="time"
+                                value={timeDrafts[row.employeeId] ?? nowHHmm()}
+                                onChange={(e) =>
+                                  setTimeDrafts((prev) => ({ ...prev, [row.employeeId]: e.target.value }))
+                                }
+                                disabled={clockingId === row.employeeId}
+                              />
+                              <button
+                                className="btn btn-primary"
+                                type="button"
+                                disabled={clockingId === row.employeeId}
+                                onClick={() => clockInFor(row.employeeId)}
+                              >
+                                {clockingId === row.employeeId ? "…" : "Clock in"}
+                              </button>
+                            </>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

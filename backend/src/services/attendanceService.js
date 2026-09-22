@@ -3,6 +3,8 @@ import { AUTO_CLOCKOUT_HOUR, HOLIDAY_KINDS } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { asYmd, isOnFullDayLeave } from "./leaveService.js";
+import { canSeeEmployee } from "./scope.js";
+import { resolveActor } from "../utils/activityLog.js";
 
 function mapEntry(row) {
   if (!row) return null;
@@ -11,6 +13,7 @@ function mapEntry(row) {
     employeeId: row.employeeId,
     clockInAt: row.clockInAt,
     clockOutAt: row.clockOutAt,
+    createdByUserId: row.createdByUserId ?? null,
   };
 }
 
@@ -56,8 +59,9 @@ export async function getAttendanceStatus(employee) {
   };
 }
 
-export async function clockIn(employee) {
-  if (!employee) throw new HttpError(409, "No employee profile");
+// Shared guard set for both self- and manager-initiated clock-in. Throws the
+// same HttpErrors clockIn() always has; callers attach their own audit entry.
+async function performClockIn(employee, clockInAt, { createdByUserId = null } = {}) {
   const store = getStore();
   const open = await store.getOpenAttendance(employee.id);
   if (open) throw new HttpError(409, "Already clocked in");
@@ -73,11 +77,18 @@ export async function clockIn(employee) {
   const row = {
     id: randomUUID(),
     employeeId: employee.id,
-    clockInAt: new Date().toISOString(),
+    clockInAt: clockInAt.toISOString(),
     clockOutAt: null,
+    createdByUserId,
   };
   await store.createAttendance(row);
-  await store.writeAudit({
+  return row;
+}
+
+export async function clockIn(employee) {
+  if (!employee) throw new HttpError(409, "No employee profile");
+  const row = await performClockIn(employee, new Date());
+  await getStore().writeAudit({
     actorUserId: employee.userId,
     action: "attendance.clock_in",
     entity: "attendance_entry",
@@ -85,6 +96,71 @@ export async function clockIn(employee) {
     afterJson: { clockInAt: row.clockInAt },
   });
   return getAttendanceStatus(employee);
+}
+
+// Manager-initiated clock-in for a team member — same guards as self
+// clock-in, but the time is caller-supplied ("HH:mm", combined with today's
+// IST date) instead of "now", and it can never be for a past calendar day.
+export async function manualClockIn({ actor, targetEmployee, clockInTime }) {
+  if (!targetEmployee) throw new HttpError(404, "Employee not found");
+  const today = new Date().toLocaleDateString("en-CA");
+  const clockInAt = new Date(`${today}T${clockInTime}:00`);
+  if (Number.isNaN(clockInAt.getTime())) {
+    throw new HttpError(422, "Invalid clock-in time");
+  }
+  if (clockInAt.getTime() > Date.now()) {
+    throw new HttpError(422, "Clock-in time can't be in the future");
+  }
+  const row = await performClockIn(targetEmployee, clockInAt, { createdByUserId: actor.id });
+  const store = getStore();
+  const who = await resolveActor(actor);
+  const formattedTime = clockInAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  await store.writeAudit({
+    actorUserId: actor.id,
+    actorEmployeeId: who.employeeId,
+    actorName: who.name,
+    action: "attendance.clock_in_manual",
+    entity: "attendance_entry",
+    entityId: row.id,
+    targetEmployeeId: targetEmployee.id,
+    targetName: targetEmployee.legalName,
+    summary: `${who.name} clocked in ${targetEmployee.legalName} at ${formattedTime}`,
+    afterJson: { clockInAt: row.clockInAt, createdByUserId: actor.id },
+  });
+  return getAttendanceStatus(targetEmployee);
+}
+
+// Team members visible to the caller (same scope as leave approval/employee
+// directory) with today's clock status — unlike listAllAttendance() this
+// never exposes anyone outside the caller's own reporting scope.
+export async function getTeamAttendanceStatus(actorEmployee, actorRole) {
+  const store = getStore();
+  const [employees, allEntries] = await Promise.all([store.listEmployees(), store.listAllAttendance()]);
+  const visible = employees.filter(
+    (e) => e.employmentStatus !== "inactive" && canSeeEmployee(actorEmployee, actorRole, e),
+  );
+  const today = new Date().toLocaleDateString("en-CA");
+  const dayOff = await getDayOff(today);
+  const results = [];
+  for (const emp of visible) {
+    const entries = allEntries.filter((a) => a.employeeId === emp.id);
+    const todayEntries = entries.filter((e) => dayKey(e.clockInAt) === today);
+    const open = entries.find((e) => !e.clockOutAt) || null;
+    const lastToday = todayEntries[todayEntries.length - 1] || null;
+    results.push({
+      employeeId: emp.id,
+      employeeName: emp.legalName,
+      employeeNumber: emp.employeeNumber,
+      jobTitle: emp.jobTitle,
+      clockedIn: Boolean(open),
+      completeForToday: Boolean(lastToday?.clockOutAt),
+      clockInAt: open?.clockInAt || lastToday?.clockInAt || null,
+      clockOutAt: open ? null : lastToday?.clockOutAt || null,
+      onLeaveToday: await isOnFullDayLeave(emp.id, today),
+      dayOff,
+    });
+  }
+  return results;
 }
 
 // All attendance entries for people management (HR / admin / owner only).

@@ -664,6 +664,7 @@ export async function createMysqlStore() {
         employeeId: r.employee_id,
         clockInAt: r.clock_in_at,
         clockOutAt: r.clock_out_at,
+        createdByUserId: r.created_by_user_id,
       }));
     },
     async listAllAttendance() {
@@ -673,6 +674,7 @@ export async function createMysqlStore() {
         employeeId: r.employee_id,
         clockInAt: r.clock_in_at,
         clockOutAt: r.clock_out_at,
+        createdByUserId: r.created_by_user_id,
       }));
     },
     async getOpenAttendance(employeeId) {
@@ -687,12 +689,19 @@ export async function createMysqlStore() {
         employeeId: r.employee_id,
         clockInAt: r.clock_in_at,
         clockOutAt: r.clock_out_at,
+        createdByUserId: r.created_by_user_id,
       };
     },
     async createAttendance(row) {
       await pool.query(
-        "INSERT INTO attendance_entries (id, employee_id, clock_in_at, clock_out_at) VALUES (?, ?, ?, ?)",
-        [row.id, row.employeeId, new Date(row.clockInAt), row.clockOutAt ? new Date(row.clockOutAt) : null],
+        "INSERT INTO attendance_entries (id, employee_id, clock_in_at, clock_out_at, created_by_user_id) VALUES (?, ?, ?, ?, ?)",
+        [
+          row.id,
+          row.employeeId,
+          new Date(row.clockInAt),
+          row.clockOutAt ? new Date(row.clockOutAt) : null,
+          row.createdByUserId ?? null,
+        ],
       );
       return row;
     },
@@ -706,6 +715,7 @@ export async function createMysqlStore() {
         employeeId: r.employee_id,
         clockInAt: r.clock_in_at,
         clockOutAt: r.clock_out_at,
+        createdByUserId: r.created_by_user_id,
       };
     },
     async listHolidays() {

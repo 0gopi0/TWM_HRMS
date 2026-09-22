@@ -101,6 +101,14 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["013_cleanup_deactivated_employee_data"]);
   }
+  const [manual] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", [
+    "014_attendance_manual_entry",
+  ]);
+  if (manual.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/014_attendance_manual_entry.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["014_attendance_manual_entry"]);
+  }
   await conn.end();
 }
 
