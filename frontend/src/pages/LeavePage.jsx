@@ -77,10 +77,6 @@ function emptyQuota(employeeId = "") {
   return { employeeId, casual: 12, paid: 12 };
 }
 
-// The owner (Manoj, CMO & Co-Founder) is part of leave allotment management like
-// everyone else; only the CEO (Chai) stays out, matching payroll's exclusion.
-const EXCLUDED_FROM_LEAVE_MANAGEMENT = new Set(["emp-chai"]);
-
 export function LeavePage() {
   const { can, user } = useAuth();
   const [rows, setRows] = useState([]);
@@ -135,9 +131,8 @@ export function LeavePage() {
     if (!isHr) return;
     Promise.all([api("/api/v1/employees?pageSize=100"), loadQuotas()])
       .then(([r]) => {
-        const selectable = r.data.filter((p) => !EXCLUDED_FROM_LEAVE_MANAGEMENT.has(p.id));
-        setPeople(selectable);
-        const first = selectable[0];
+        setPeople(r.data);
+        const first = r.data[0];
         if (first) setFilterId((id) => id || first.id);
       })
       .catch((e) => setError(e.message));
@@ -397,7 +392,7 @@ export function LeavePage() {
                 <h2>All allotments</h2>
                 <span className="spacer" />
                 <span className="muted" style={{ fontSize: 12 }}>
-                  {quotaRows.filter((row) => !EXCLUDED_FROM_LEAVE_MANAGEMENT.has(row.employeeId)).length} people
+                  {quotaRows.length} people
                 </span>
               </div>
               <div className="table-wrap">
@@ -410,9 +405,7 @@ export function LeavePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {quotaRows
-                      .filter((row) => !EXCLUDED_FROM_LEAVE_MANAGEMENT.has(row.employeeId))
-                      .map((row) => (
+                    {quotaRows.map((row) => (
                       <tr key={row.employeeId}>
                         <td>
                           <button className="btn btn-ghost" type="button" onClick={() => setFilterId(row.employeeId)}>

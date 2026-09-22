@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { PAYROLL_OPERATOR_EMPLOYEE_IDS, PERMISSIONS } from "@twm/shared";
+import { PERMISSIONS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
 import { downloadPayslipPdf } from "../services/payslipPdf.js";
 
-const PAYROLL_OPERATORS = new Set(PAYROLL_OPERATOR_EMPLOYEE_IDS);
-
 const PF_TAX_AMOUNT = 200;
 const PF_TAX_THRESHOLD = 25000;
-
-// No payroll is generated for these people (top of the house / co-founder level).
-const EXCLUDED_FROM_PAYROLL = new Set(["emp-manoj", "emp-chai"]);
 
 function currentPeriod() {
   const now = new Date();
@@ -73,23 +68,19 @@ export function PayrollPage() {
   const [runningPayment, setRunningPayment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState("");
-  const isHr = can(PERMISSIONS.PAYROLL_WRITE_COMPANY);
-  // Narrower than the PAYROLL_WRITE_COMPANY permission: only the payroll
-  // team (Chai, Nagendra, Priya, Manoj) may create payslips or run payment.
-  const canOperatePayroll = PAYROLL_OPERATORS.has(user?.employee?.id);
+  // Company-wide payroll — every HR person, plus the owner. Everyone else
+  // sees their own payslips only.
+  const canOperatePayroll = can(PERMISSIONS.PAYROLL_WRITE_COMPANY);
 
   async function load() {
     const slips = await api("/api/v1/payroll/payslips");
     setRows(slips.data);
-    if (isHr) {
+    if (canOperatePayroll) {
       // Former employees are included so their old payslips still show a name
       // (and a final settlement can still be raised for them).
       const emps = await api("/api/v1/employees?pageSize=100&includeInactive=1");
       setPeople(emps.data);
-      const selectable = emps.data.filter((p) => !EXCLUDED_FROM_PAYROLL.has(p.id));
-      if (!employeeId && selectable[0]) setEmployeeId(selectable[0].id);
-    }
-    if (canOperatePayroll) {
+      if (!employeeId && emps.data[0]) setEmployeeId(emps.data[0].id);
       const leave = await api("/api/v1/leave?pageSize=500");
       setLeaveRows(leave.data || []);
     }
@@ -225,9 +216,7 @@ export function PayrollPage() {
           <p className="page-sub">
             {canOperatePayroll
               ? "Add a monthly payslip: base salary plus any extras like travel or bonuses."
-              : isHr
-                ? "Payslip creation and payment runs are handled by the payroll team."
-                : "Your payslips only."}
+              : "Your payslips only."}
           </p>
         </div>
       </div>
@@ -240,13 +229,11 @@ export function PayrollPage() {
             <label>
               Employee
               <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
-                {people
-                  .filter((p) => !EXCLUDED_FROM_PAYROLL.has(p.id))
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.legalName}
-                    </option>
-                  ))}
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.legalName}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
@@ -443,8 +430,6 @@ export function PayrollPage() {
             </button>
           </div>
         </form>
-      ) : isHr ? (
-        <p className="muted">Only the payroll team can create payslips or run payment.</p>
       ) : (
         <p className="muted">Salary amounts for other people are never shown to this role.</p>
       )}

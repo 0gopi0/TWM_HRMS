@@ -1,15 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { PAYROLL_OPERATOR_EMPLOYEE_IDS, ROLES } from "@twm/shared";
+import { hasPermission, PERMISSIONS } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { stripSalary } from "./scope.js";
 import { resolveActor } from "../utils/activityLog.js";
-
-// Who can see every employee's payslip. Everyone else only ever sees their own.
-const PAYROLL_VIEW_ALL = new Set([ROLES.HR, ROLES.OWNER]);
-// Who can create payslips or run payment: only these two people (accounting),
-// not the whole HR/Admin/Owner role that otherwise has payroll read access.
-const PAYROLL_OPERATORS = new Set(PAYROLL_OPERATOR_EMPLOYEE_IDS);
 
 // PF / tax rule: ₹200 flat when gross pay reaches ₹25,000 or more.
 const PF_TAX_AMOUNT = 200;
@@ -37,24 +31,18 @@ export function computePay({ baseSalary, extras }) {
 export async function listPayslips(user, employee) {
   const store = getStore();
   const all = await store.listPayslips();
-  const scoped =
-    PAYROLL_VIEW_ALL.has(user.role) ? all : all.filter((p) => p.employeeId === employee?.id);
+  // Company-wide payroll access (HR and the owner) sees every payslip;
+  // everyone else only ever sees their own.
+  const scoped = hasPermission(user.role, PERMISSIONS.PAYROLL_WRITE_COMPANY)
+    ? all
+    : all.filter((p) => p.employeeId === employee?.id);
   return scoped.map((p) => stripSalary(p, user.role, employee?.id));
 }
 
-// No payroll is generated for these people (top of the house / co-founder level).
-const EXCLUDED_FROM_PAYROLL = new Set(["emp-manoj", "emp-chai"]);
-
 export async function createPayslip({ user, actorEmployeeId, employeeId, period, baseSalary, extras, requestId, ip }) {
-  if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
-    throw new HttpError(403, "Only the payroll team can create payslips");
-  }
   const store = getStore();
   const emp = await store.getEmployeeById(employeeId);
   if (!emp) throw new HttpError(404, "Employee not found");
-  if (EXCLUDED_FROM_PAYROLL.has(employeeId)) {
-    throw new HttpError(422, "Payroll is not generated for this employee");
-  }
   const pay = computePay({ baseSalary, extras });
   const row = {
     id: randomUUID(),
@@ -90,9 +78,6 @@ export async function createPayslip({ user, actorEmployeeId, employeeId, period,
 }
 
 export async function deletePayslip({ user, actorEmployeeId, id, requestId, ip }) {
-  if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
-    throw new HttpError(403, "Only the payroll team can delete payslips");
-  }
   const store = getStore();
   const existing = await store.getPayslip(id);
   const deleted = await store.deletePayslip(id);
@@ -120,9 +105,6 @@ export async function deletePayslip({ user, actorEmployeeId, id, requestId, ip }
 }
 
 export async function runPayment({ user, actorEmployeeId, idempotencyKey }) {
-  if (!PAYROLL_OPERATORS.has(actorEmployeeId)) {
-    throw new HttpError(403, "Only the payroll team can run payment");
-  }
   const store = getStore();
   const existing = await store.findPaymentRunByKey(idempotencyKey);
   if (existing) return existing;

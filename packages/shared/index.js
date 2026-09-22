@@ -61,19 +61,20 @@ const ADMIN = [
   PERMISSIONS.LEAVE_READ_COMPANY,
   PERMISSIONS.LEAVE_APPROVE_COMPANY,
   PERMISSIONS.LEAVE_POLICY_WRITE,
-  PERMISSIONS.PAYROLL_WRITE_COMPANY,
   PERMISSIONS.USER_PROVISION_COMPANY,
 ];
 
 // The Activity Log (who did what, to whom) is HR + Owner only — same
 // company-wide-people rule as EMPLOYEE_READ_COMPANY above, and for the same
 // reason: the generic "Admin Access" role shouldn't see everyone's HR/payroll
-// actions.
+// actions. Running payroll belongs to the whole HR role too, so every HR
+// person (and every future HR hire) can create payslips and run payments.
 const HR = [
   ...ADMIN,
   PERMISSIONS.EMPLOYEE_READ_COMPANY,
   PERMISSIONS.EMPLOYEE_WRITE_COMPANY,
   PERMISSIONS.AUDIT_READ_COMPANY,
+  PERMISSIONS.PAYROLL_WRITE_COMPANY,
 ];
 
 export const ROLE_PERMISSIONS = Object.freeze({
@@ -143,11 +144,6 @@ export const LEAVE_ENTITLEMENT_LIST = Object.freeze(Object.keys(LEAVE_ENTITLEMEN
 export const AUTO_CLOCKOUT_HOUR = 22;
 
 export const DEMO_PASSWORD = "LocalDev!23";
-
-// Payslip creation and running payment are restricted to these two people
-// specifically (accounting), not the whole HR/Admin/Owner role — narrower
-// than PERMISSIONS.PAYROLL_WRITE_COMPANY, which still governs read access.
-export const PAYROLL_OPERATOR_EMPLOYEE_IDS = Object.freeze(["emp-chai", "emp-nagendra", "emp-priya", "emp-manoj"]);
 
 // Full org chart. managerId builds the reporting tree; the leave approval
 // chain follows managerId up to the top (Manoj, the owner).
