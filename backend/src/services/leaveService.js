@@ -443,8 +443,10 @@ export function visibleLeave(actorRole, actorEmployee, items, employeesById) {
     if (actorRole === ROLES.OWNER || actorRole === ROLES.HR) return true;
     // Managers/leads see their reports' requests.
     if (target.managerId === actorEmployee.id) return true;
-    if (actorRole === ROLES.TEAM_LEADER) return target.teamId === actorEmployee.teamId;
-    if (actorRole === ROLES.MANAGER) return target.departmentId === actorEmployee.departmentId;
+    // teamId/departmentId are nullable — without the truthy check, two people
+    // who both have no team assigned would match each other via null === null.
+    if (actorRole === ROLES.TEAM_LEADER) return Boolean(actorEmployee.teamId) && target.teamId === actorEmployee.teamId;
+    if (actorRole === ROLES.MANAGER) return Boolean(actorEmployee.departmentId) && target.departmentId === actorEmployee.departmentId;
     return false;
   });
 }
