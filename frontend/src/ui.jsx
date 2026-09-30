@@ -6,7 +6,10 @@ import { LEAVE_TYPE_LABELS } from "@twm/shared";
 // records rather than something the employee applied for themselves.
 export function leaveTypeLabel(row) {
   if (row?.isLop) return "LOP";
-  return LEAVE_TYPE_LABELS[row?.leaveType] || row?.leaveType;
+  const label = LEAVE_TYPE_LABELS[row?.leaveType] || row?.leaveType;
+  // An Intern/Probation sick leave that used their casual balance.
+  if (row?.chargedTo && row.chargedTo !== row.leaveType) return `${label} (from ${row.chargedTo})`;
+  return label;
 }
 
 export function SparkIcon({ d, size = 18 }) {

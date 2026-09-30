@@ -1,5 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { LEAVE_ENTITLEMENT_LIST, LEAVE_ENTITLEMENTS, LEAVE_NOTICE_DAYS, LEAVE_TYPE_LABELS, LEAVE_TYPE_LIST, ROLES } from "@twm/shared";
+import {
+  EMPLOYMENT_TYPES,
+  LEAVE_ENTITLEMENT_LIST,
+  LEAVE_ENTITLEMENTS,
+  LEAVE_NOTICE_DAYS,
+  LEAVE_TYPE_LABELS,
+  LEAVE_TYPE_LIST,
+  LEAVE_TYPES,
+  ROLES,
+} from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { resolveActor } from "../utils/activityLog.js";
@@ -82,17 +91,25 @@ function isPending(status) {
   return String(status).startsWith("pending");
 }
 
-export function summarizeBalances(rows, year, entitlementRows = []) {
-  const used = Object.fromEntries(LEAVE_ENTITLEMENT_LIST.map((t) => [t, 0]));
-  const pending = Object.fromEntries(LEAVE_ENTITLEMENT_LIST.map((t) => [t, 0]));
+// A person's allotment per leave type for a year: their saved rows, falling
+// back to the company default for any type without one.
+export function effectiveAllotment(entitlementRows = []) {
   const allotted = { ...LEAVE_ENTITLEMENTS };
   for (const row of entitlementRows) {
     allotted[row.leaveType] = row.days;
   }
+  return allotted;
+}
+
+export function summarizeBalances(rows, year, entitlementRows = []) {
+  const used = Object.fromEntries(LEAVE_ENTITLEMENT_LIST.map((t) => [t, 0]));
+  const pending = Object.fromEntries(LEAVE_ENTITLEMENT_LIST.map((t) => [t, 0]));
+  const allotted = effectiveAllotment(entitlementRows);
   for (const row of rows) {
     if (row.status === "rejected") continue;
     const days = daysConsumed(row, year);
-    const leaveType = row.leaveType === "paid" ? "sick" : row.leaveType;
+    // chargedTo: an intern's sick leave that drew on their casual balance.
+    const leaveType = row.chargedTo || (row.leaveType === "paid" ? "sick" : row.leaveType);
     if (!LEAVE_ENTITLEMENT_LIST.includes(leaveType)) continue;
     if (row.status === "approved") used[leaveType] += days;
     else if (isPending(row.status)) pending[leaveType] += days;
@@ -181,19 +198,29 @@ export async function saveEntitlements({ actor, employeeId, year, casual, paid, 
   return { employeeId, employeeName: employee.legalName, year, casual, paid, unpaid };
 }
 
-async function assertHasBalance({ employeeId, leaveType, startDate, endDate, halfDay, ignoreId }) {
+// Which balance a new request is charged to: null for its own type, or
+// "casual" when an Intern/Probation person's sick leave has to draw on their
+// casual balance (they're credited no sick leave, and casual needs 7 days'
+// notice — this is how they can still take a sick day). Their own sick
+// balance, if they have any, is used first; one request is never split
+// across both. Throws when neither covers it.
+async function resolveChargedBalance({ employee, leaveType, startDate, endDate, halfDay }) {
   const year = Number(asYmd(startDate).slice(0, 4));
   const store = getStore();
-  const rows = (await store.listLeave()).filter((row) => row.employeeId === employeeId && row.id !== ignoreId);
-  const entitlementRows = await store.getEntitlements(employeeId, year);
+  const rows = (await store.listLeave()).filter((row) => row.employeeId === employee.id);
+  const entitlementRows = await store.getEntitlements(employee.id, year);
   const items = summarizeBalances(rows, year, entitlementRows);
   const type = leaveType === "paid" ? "sick" : leaveType;
   const item = items.find((i) => i.leaveType === type);
-  if (!item || item.remaining == null) return;
+  if (!item || item.remaining == null) return null;
   const need = halfDay ? 0.5 : overlapDays(startDate, endDate, year);
-  if (item.remaining < need) {
-    throw new HttpError(422, `Not enough ${LEAVE_TYPE_LABELS[type] || type} remaining`);
+  if (item.remaining >= need) return null;
+  if (type === LEAVE_TYPES.SICK && employee.employmentType === EMPLOYMENT_TYPES.INTERN) {
+    const casual = items.find((i) => i.leaveType === LEAVE_TYPES.CASUAL);
+    if (casual?.remaining != null && casual.remaining >= need) return LEAVE_TYPES.CASUAL;
+    throw new HttpError(422, "Not enough sick or casual leave remaining");
   }
+  throw new HttpError(422, `Not enough ${LEAVE_TYPE_LABELS[type] || type} remaining`);
 }
 
 // Half-day leaves are only valid for a single calendar day.
@@ -206,7 +233,7 @@ function assertHalfDay(halfDay, startDate, endDate) {
 export async function createLeaveRequest({ employee, leaveType, startDate, endDate, reason, halfDay = false }) {
   assertLeaveWindow({ leaveType, startDate, endDate, enforceNotice: true });
   assertHalfDay(halfDay, startDate, endDate);
-  await assertHasBalance({ employeeId: employee.id, leaveType, startDate, endDate, halfDay });
+  const chargedTo = await resolveChargedBalance({ employee, leaveType, startDate, endDate, halfDay });
   const store = getStore();
   // First approver: the sales team's leave goes straight to the owner
   // (leaveApproverId override); everyone else goes to their direct manager.
@@ -218,6 +245,7 @@ export async function createLeaveRequest({ employee, leaveType, startDate, endDa
       id: randomUUID(),
       employeeId: employee.id,
       leaveType,
+      chargedTo,
       startDate: asYmd(startDate),
       endDate: asYmd(endDate),
       reason,
@@ -230,6 +258,7 @@ export async function createLeaveRequest({ employee, leaveType, startDate, endDa
     id: randomUUID(),
     employeeId: employee.id,
     leaveType,
+    chargedTo,
     startDate: asYmd(startDate),
     endDate: asYmd(endDate),
     reason,

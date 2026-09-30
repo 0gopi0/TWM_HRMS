@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { ASSIGNABLE_ROLES, PERMISSIONS, ROLES, ROLE_LABELS } from "@twm/shared";
+import {
+  ASSIGNABLE_ROLES,
+  EMPLOYMENT_TYPES,
+  EMPLOYMENT_TYPE_LABELS,
+  EMPLOYMENT_TYPE_LIST,
+  PERMISSIONS,
+  ROLES,
+  ROLE_LABELS,
+} from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
 import { useToast } from "../toast.jsx";
@@ -73,6 +81,7 @@ function emptyForm() {
     email: "",
     password: "",
     jobTitle: "",
+    employmentType: EMPLOYMENT_TYPES.FULL_TIME,
     role: "team_member",
     departmentId: "",
     reportsTo: "",
@@ -331,6 +340,7 @@ export function EmployeesPage() {
       employeeNumber: emp.employeeNumber || "",
       email: emp.email || "",
       jobTitle: emp.jobTitle || "",
+      employmentType: emp.employmentType || EMPLOYMENT_TYPES.FULL_TIME,
       role: emp.role || "team_member",
       departmentId: emp.departmentId || "",
       reportsTo,
@@ -372,6 +382,7 @@ export function EmployeesPage() {
       const payload = {
         legalName: form.legalName.trim(),
         jobTitle: form.jobTitle.trim() || undefined,
+        employmentType: form.employmentType,
         departmentId: form.departmentId,
         // The org top keeps no team/manager, regardless of what the
         // (disabled, informational-only) Reports to field shows for them.
@@ -561,6 +572,20 @@ export function EmployeesPage() {
               ) : (
                 <input value={ROLE_LABELS[editingEmployee?.role] || editingEmployee?.role || ""} disabled />
               )}
+            </label>
+            <label>
+              Employment type
+              <select
+                value={form.employmentType}
+                onChange={(e) => setForm({ ...form, employmentType: e.target.value })}
+                required
+              >
+                {EMPLOYMENT_TYPE_LIST.map((t) => (
+                  <option key={t} value={t}>
+                    {EMPLOYMENT_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Department

@@ -481,7 +481,7 @@ export function DashboardPage() {
                         {remaining == null ? "Unlimited" : `${remaining} left`}
                       </p>
                       <p className="balance-meta">
-                        {allotted ? `${used} used of ${allotted}` : "No yearly cap"}
+                        {item.allotted == null ? "No yearly cap" : `${used} used of ${allotted}`}
                         {item.pending ? ` · ${item.pending} pending` : ""}
                       </p>
                       {allotted ? (

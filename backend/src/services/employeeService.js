@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
-import { ASSIGNABLE_ROLES } from "@twm/shared";
+import { ASSIGNABLE_ROLES, EMPLOYMENT_TYPE_LABELS } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { resolveActor } from "../utils/activityLog.js";
+import { startLeaveCreditForNewJoiner } from "./leaveCreditService.js";
 
 const EMPLOYEE_NUMBER_PREFIX = "TWM-";
 
@@ -63,6 +64,7 @@ export async function createEmployee({
   password,
   legalName,
   jobTitle,
+  employmentType,
   role,
   departmentId,
   teamId,
@@ -102,6 +104,7 @@ export async function createEmployee({
     employeeNumber: nextEmployeeNumber(employees),
     legalName: legalName.trim(),
     jobTitle: jobTitle?.trim() || null,
+    employmentType,
     departmentId,
     teamId: teamId || null,
     managerId: resolvedManagerId,
@@ -115,6 +118,7 @@ export async function createEmployee({
     if (err.code === "DUPLICATE_EMAIL") throw new HttpError(409, err.message);
     throw err;
   }
+  await startLeaveCreditForNewJoiner({ employee: created });
 
   const actor = await resolveActor(actorUser);
   await store.writeAudit({
@@ -127,7 +131,7 @@ export async function createEmployee({
     targetEmployeeId: created.id,
     targetName: employee.legalName,
     summary: `${actor.name} added ${employee.legalName} as a new employee`,
-    afterJson: { email: user.email, legalName: employee.legalName, role, departmentId, teamId },
+    afterJson: { email: user.email, legalName: employee.legalName, role, employmentType, departmentId, teamId },
     requestId,
     ip,
   });
@@ -146,6 +150,7 @@ export async function updateEmployee({
   employeeNumber,
   email,
   jobTitle,
+  employmentType,
   role,
   departmentId,
   teamId,
@@ -193,11 +198,16 @@ export async function updateEmployee({
   }
 
   const emailChanged = Boolean(email && currentUser && currentUser.email !== email);
+  // Compared before saving: the memory store hands back the live record, so
+  // `existing` already shows the new values once store.updateEmployee runs.
+  const previousEmploymentType = existing.employmentType;
+  const typeChanged = employmentType !== previousEmploymentType;
 
   const updates = {
     legalName: legalName.trim(),
     employeeNumber: employeeNumber.trim(),
     jobTitle: jobTitle?.trim() || null,
+    employmentType,
     departmentId,
     teamId: teamId || null,
     managerId: resolvedManagerId,
@@ -224,6 +234,11 @@ export async function updateEmployee({
   const changedBits = [];
   if (numberChanged) changedBits.push("ID number");
   if (roleChanged) changedBits.push(`role to ${role}`);
+  // Takes effect from the next 1st-of-month leave credit; what's already
+  // been credited stays.
+  if (typeChanged) {
+    changedBits.push(`employment type to ${EMPLOYMENT_TYPE_LABELS[employmentType] || employmentType}`);
+  }
   if (emailChanged) changedBits.push("email");
   const summary = changedBits.length
     ? `${actor.name} updated ${updates.legalName}'s ${changedBits.join(" and ")}`
@@ -243,6 +258,7 @@ export async function updateEmployee({
       employeeNumber: existing.employeeNumber,
       email: currentUser?.email,
       jobTitle: existing.jobTitle,
+      employmentType: previousEmploymentType,
       departmentId: existing.departmentId,
       teamId: existing.teamId,
       managerId: existing.managerId,

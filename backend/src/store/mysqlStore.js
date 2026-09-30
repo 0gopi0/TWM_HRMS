@@ -24,6 +24,7 @@ function mapEmployee(row) {
     employeeNumber: row.employee_number,
     legalName: row.legal_name,
     jobTitle: row.job_title || null,
+    employmentType: row.employment_type || "full_time",
     departmentId: row.department_id,
     teamId: row.team_id,
     managerId: row.manager_id,
@@ -65,9 +66,9 @@ export async function createMysqlStore() {
       }
       for (const e of seed.employees) {
         await conn.query(
-          `INSERT INTO employees (id, user_id, employee_number, legal_name, job_title, department_id, manager_id, leave_approver_id, employment_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [e.id, e.userId, e.employeeNumber, e.legalName, e.jobTitle || null, e.departmentId, e.managerId, e.leaveApproverId || null, e.employmentStatus],
+          `INSERT INTO employees (id, user_id, employee_number, legal_name, job_title, employment_type, department_id, manager_id, leave_approver_id, employment_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [e.id, e.userId, e.employeeNumber, e.legalName, e.jobTitle || null, e.employmentType, e.departmentId, e.managerId, e.leaveApproverId || null, e.employmentStatus],
         );
       }
       for (const t of seed.teams) {
@@ -232,14 +233,15 @@ export async function createMysqlStore() {
         );
         await conn.query(
           `INSERT INTO employees
-           (id, user_id, employee_number, legal_name, job_title, department_id, team_id, manager_id, leave_approver_id, employment_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, user_id, employee_number, legal_name, job_title, employment_type, department_id, team_id, manager_id, leave_approver_id, employment_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             employee.id,
             user.id,
             employee.employeeNumber,
             employee.legalName,
             employee.jobTitle || null,
+            employee.employmentType,
             employee.departmentId,
             employee.teamId || null,
             employee.managerId || null,
@@ -261,16 +263,17 @@ export async function createMysqlStore() {
       }
       return { ...employee, employmentStatus: "active" };
     },
-    async updateEmployee(id, { legalName, employeeNumber, jobTitle, departmentId, teamId, managerId, leaveApproverId }) {
+    async updateEmployee(id, { legalName, employeeNumber, jobTitle, employmentType, departmentId, teamId, managerId, leaveApproverId }) {
       try {
         await pool.query(
           `UPDATE employees
-           SET legal_name = ?, employee_number = ?, job_title = ?, department_id = ?, team_id = ?, manager_id = ?, leave_approver_id = ?
+           SET legal_name = ?, employee_number = ?, job_title = ?, employment_type = ?, department_id = ?, team_id = ?, manager_id = ?, leave_approver_id = ?
            WHERE id = ?`,
           [
             legalName,
             employeeNumber,
             jobTitle || null,
+            employmentType,
             departmentId,
             teamId || null,
             managerId || null,
@@ -315,6 +318,7 @@ export async function createMysqlStore() {
           await conn.query("DELETE FROM leave_requests WHERE employee_id = ?", [id]);
         }
         await conn.query("DELETE FROM leave_entitlements WHERE employee_id = ?", [id]);
+        await conn.query("DELETE FROM leave_credits WHERE employee_id = ?", [id]);
         await conn.query("DELETE FROM attendance_entries WHERE employee_id = ?", [id]);
         await conn.query("DELETE FROM salary_structures WHERE employee_id = ?", [id]);
         await conn.query("DELETE FROM payslips WHERE employee_id = ?", [id]);
@@ -418,6 +422,7 @@ export async function createMysqlStore() {
         halfDay: Boolean(r.half_day),
         reason: r.reason,
         isLop: Boolean(r.is_lop),
+        chargedTo: r.charged_to || null,
         createdAt: r.created_at,
       }));
     },
@@ -436,13 +441,14 @@ export async function createMysqlStore() {
         halfDay: Boolean(r.half_day),
         reason: r.reason,
         isLop: Boolean(r.is_lop),
+        chargedTo: r.charged_to || null,
       };
     },
     async createLeave(row) {
       await pool.query(
-        `INSERT INTO leave_requests (id, employee_id, leave_type, start_date, end_date, status, approver_employee_id, half_day, reason, is_lop)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [row.id, row.employeeId, row.leaveType, row.startDate, row.endDate, row.status, row.approverEmployeeId ?? null, row.halfDay ? 1 : 0, row.reason, row.isLop ? 1 : 0],
+        `INSERT INTO leave_requests (id, employee_id, leave_type, charged_to, start_date, end_date, status, approver_employee_id, half_day, reason, is_lop)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [row.id, row.employeeId, row.leaveType, row.chargedTo ?? null, row.startDate, row.endDate, row.status, row.approverEmployeeId ?? null, row.halfDay ? 1 : 0, row.reason, row.isLop ? 1 : 0],
       );
       return row;
     },
@@ -785,6 +791,44 @@ export async function createMysqlStore() {
         conn.release();
       }
       return this.getEntitlements(employeeId, year);
+    },
+    // Records this month's credit for someone and adds it to their allotment
+    // for `year`, atomically. The leave_credits primary key is the guard: if
+    // the month is already recorded nothing changes and this returns false.
+    // `baseIfMissing` is what their allotment effectively is when they have no
+    // row for the year yet (the default, or last year's carry-forward), so
+    // adding the credit never changes the balance they already see. A zero
+    // credit just marks the month done — how a new joiner skips the month
+    // they join in.
+    async creditMonthlyLeave({ employeeId, period, year, employmentType, credit, baseIfMissing }) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [ins] = await conn.query(
+          `INSERT IGNORE INTO leave_credits (employee_id, period, employment_type, casual, sick)
+           VALUES (?, ?, ?, ?, ?)`,
+          [employeeId, period, employmentType, credit.casual || 0, credit.sick || 0],
+        );
+        if (ins.affectedRows === 0) {
+          await conn.rollback();
+          return false;
+        }
+        for (const [leaveType, base] of Object.entries(baseIfMissing)) {
+          const add = credit[leaveType] || 0;
+          await conn.query(
+            `INSERT INTO leave_entitlements (employee_id, year, leave_type, days) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE days = days + ?`,
+            [employeeId, year, leaveType, base + add, add],
+          );
+        }
+        await conn.commit();
+        return true;
+      } catch (err) {
+        await conn.rollback();
+        throw err;
+      } finally {
+        conn.release();
+      }
     },
   };
 }

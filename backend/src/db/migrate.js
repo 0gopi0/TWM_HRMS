@@ -109,6 +109,20 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["014_attendance_manual_entry"]);
   }
+  const [credit] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", [
+    "015_employment_type_leave_credit",
+  ]);
+  if (credit.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/015_employment_type_leave_credit.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["015_employment_type_leave_credit"]);
+  }
+  const [charged] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", ["016_leave_charged_to"]);
+  if (charged.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/016_leave_charged_to.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["016_leave_charged_to"]);
+  }
   await conn.end();
 }
 

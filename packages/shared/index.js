@@ -144,6 +144,30 @@ export const LEAVE_ENTITLEMENTS = Object.freeze({
 
 export const LEAVE_ENTITLEMENT_LIST = Object.freeze(Object.keys(LEAVE_ENTITLEMENTS));
 
+// Set per person on the People form; decides how much leave they're credited
+// on the 1st of every month.
+export const EMPLOYMENT_TYPES = Object.freeze({
+  FULL_TIME: "full_time",
+  INTERN: "intern",
+});
+
+export const EMPLOYMENT_TYPE_LIST = Object.freeze(Object.values(EMPLOYMENT_TYPES));
+
+export const EMPLOYMENT_TYPE_LABELS = Object.freeze({
+  [EMPLOYMENT_TYPES.FULL_TIME]: "Full time",
+  [EMPLOYMENT_TYPES.INTERN]: "Intern/Probation",
+});
+
+// Days added to each person's leave allotment on the 1st of every month.
+export const MONTHLY_LEAVE_CREDIT = Object.freeze({
+  [EMPLOYMENT_TYPES.FULL_TIME]: Object.freeze({ [LEAVE_TYPES.CASUAL]: 1, [LEAVE_TYPES.SICK]: 0.5 }),
+  [EMPLOYMENT_TYPES.INTERN]: Object.freeze({ [LEAVE_TYPES.CASUAL]: 1, [LEAVE_TYPES.SICK]: 0 }),
+});
+
+// The first month (YYYY-MM) that gets a monthly credit. Balances before it
+// were set by hand and are left as they were.
+export const LEAVE_CREDIT_START_PERIOD = "2026-10";
+
 // Anyone still clocked in is automatically clocked out at this hour, on the day
 // they clocked in. Local time — the app is pinned to IST (see config/env.js).
 export const AUTO_CLOCKOUT_HOUR = 22;

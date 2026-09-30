@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
-import { DEMO_ACCOUNTS, DEMO_PASSWORD, LEAVE_ENTITLEMENT_LIST, LEAVE_ENTITLEMENTS, PERMISSIONS, ROLE_PERMISSIONS } from "@twm/shared";
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, EMPLOYMENT_TYPES, LEAVE_ENTITLEMENT_LIST, LEAVE_ENTITLEMENTS, PERMISSIONS, ROLE_PERMISSIONS } from "@twm/shared";
 
 export function hashToken(token) {
   return createHash("sha256").update(token).digest("hex");
@@ -55,6 +55,7 @@ export async function buildSeed() {
     employeeNumber: a.employeeNumber,
     legalName: a.name,
     jobTitle: a.jobTitle,
+    employmentType: EMPLOYMENT_TYPES.FULL_TIME,
     departmentId: a.departmentId,
     teamId: a.teamId,
     managerId: a.managerId,

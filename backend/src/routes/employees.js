@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { ASSIGNABLE_ROLES, PERMISSIONS, hasPermission, permissionsForRole } from "@twm/shared";
+import { ASSIGNABLE_ROLES, EMPLOYMENT_TYPE_LIST, PERMISSIONS, hasPermission, permissionsForRole } from "@twm/shared";
 import { authenticate, attachEmployee } from "../middleware/authenticate.js";
 import { authorize } from "../middleware/authorize.js";
 import { validate } from "../middleware/validate.js";
@@ -85,6 +85,7 @@ employeesRouter.post(
       password: z.string().min(8).max(128),
       legalName: z.string().trim().min(1).max(255),
       jobTitle: z.string().trim().max(128).optional(),
+      employmentType: z.enum(EMPLOYMENT_TYPE_LIST),
       role: z.enum(ASSIGNABLE_ROLES),
       departmentId: z.string().min(1),
       teamId: z.string().min(1).optional(),
@@ -132,6 +133,7 @@ employeesRouter.patch(
       employeeNumber: z.string().trim().min(1).max(32),
       email: z.string().trim().toLowerCase().email().optional(),
       jobTitle: z.string().trim().max(128).optional(),
+      employmentType: z.enum(EMPLOYMENT_TYPE_LIST),
       role: z.enum(ASSIGNABLE_ROLES).optional(),
       departmentId: z.string().min(1),
       teamId: z.string().min(1).optional(),

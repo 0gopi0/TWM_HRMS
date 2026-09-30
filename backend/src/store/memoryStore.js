@@ -19,6 +19,7 @@ export async function createMemoryStore() {
   const holidays = [...seed.holidays];
   const leaveRequests = [...seed.leaveRequests];
   const leaveEntitlements = [...(seed.leaveEntitlements || [])];
+  const leaveCredits = [];
 
   return {
     kind: "memory",
@@ -167,6 +168,9 @@ export async function createMemoryStore() {
       }
       for (let i = leaveEntitlements.length - 1; i >= 0; i--) {
         if (leaveEntitlements[i].employeeId === id) leaveEntitlements.splice(i, 1);
+      }
+      for (let i = leaveCredits.length - 1; i >= 0; i--) {
+        if (leaveCredits[i].employeeId === id) leaveCredits.splice(i, 1);
       }
       for (let i = attendance.length - 1; i >= 0; i--) {
         if (attendance[i].employeeId === id) attendance.splice(i, 1);
@@ -377,6 +381,20 @@ export async function createMemoryStore() {
       leaveEntitlements.length = 0;
       leaveEntitlements.push(...kept, ...items.map((row) => ({ ...row, employeeId, year })));
       return leaveEntitlements.filter((row) => row.employeeId === employeeId && row.year === year);
+    },
+    // See mysqlStore.creditMonthlyLeave.
+    async creditMonthlyLeave({ employeeId, period, year, employmentType, credit, baseIfMissing }) {
+      if (leaveCredits.some((row) => row.employeeId === employeeId && row.period === period)) return false;
+      leaveCredits.push({ employeeId, period, employmentType, casual: credit.casual || 0, sick: credit.sick || 0 });
+      for (const [leaveType, base] of Object.entries(baseIfMissing)) {
+        const add = credit[leaveType] || 0;
+        const row = leaveEntitlements.find(
+          (r) => r.employeeId === employeeId && r.year === year && r.leaveType === leaveType,
+        );
+        if (row) row.days += add;
+        else leaveEntitlements.push({ employeeId, year, leaveType, days: base + add });
+      }
+      return true;
     },
   };
 }

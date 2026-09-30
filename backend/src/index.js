@@ -6,6 +6,7 @@ import { initStore } from "./store/index.js";
 import { closePool } from "./db/pool.js";
 import { purgeOldActivity } from "./services/activityLogService.js";
 import { autoClockOutOpenEntries } from "./services/attendanceService.js";
+import { runMonthlyLeaveCredit } from "./services/leaveCreditService.js";
 
 const app = createApp();
 const server = createServer(app);
@@ -58,6 +59,42 @@ function scheduleAutoClockOut() {
   arm();
 }
 
+function runMonthlyLeaveCreditJob() {
+  runMonthlyLeaveCredit()
+    .then((credited) => {
+      if (credited.length > 0) {
+        console.log(`Monthly leave credit: credited ${credited.length} ${credited.length === 1 ? "person" : "people"} for ${credited[0].period}`);
+      }
+    })
+    .catch((err) => console.error("Monthly leave credit failed:", err));
+}
+
+// Milliseconds to the next local midnight (plus a minute of slack, so the run
+// lands clearly inside the new day).
+function msUntilNextMidnight(from = new Date()) {
+  const next = new Date(from);
+  next.setHours(24, 1, 0, 0);
+  return next - from;
+}
+
+// Credits the 1st-of-month leave. Checks at boot and after every midnight
+// rather than only on the 1st: a host that restarts or is down on the 1st
+// still credits the month on its next check, and the credit ledger turns
+// every other run into a no-op.
+let leaveCreditTimer;
+
+function scheduleMonthlyLeaveCredit() {
+  runMonthlyLeaveCreditJob();
+  const arm = () => {
+    leaveCreditTimer = setTimeout(() => {
+      runMonthlyLeaveCreditJob();
+      arm();
+    }, msUntilNextMidnight());
+    leaveCreditTimer.unref();
+  };
+  arm();
+}
+
 // The timezone the whole app computes day boundaries in — worth seeing in the
 // host logs, since "10 PM" and the attendance day both depend on it.
 function timezoneLabel() {
@@ -88,6 +125,7 @@ async function start() {
   // config/env.js), so log it — on the host this is the only place to see it.
   console.log(`Timezone ${timezoneLabel()} — auto clock-out at ${AUTO_CLOCKOUT_HOUR}:00`);
   scheduleAutoClockOut();
+  scheduleMonthlyLeaveCredit();
   server.listen(env.PORT, env.HOST, () => {
     console.log(`API listening on http://${env.HOST}:${env.PORT}`);
   });

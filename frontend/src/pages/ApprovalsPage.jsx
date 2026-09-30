@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { LEAVE_TYPE_LABELS, PERMISSIONS } from "@twm/shared";
+import { PERMISSIONS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
+import { leaveTypeLabel } from "../ui.jsx";
 
 function formatTime(value) {
   if (!value) return "—";
@@ -136,7 +137,7 @@ export function ApprovalsPage() {
                 {approvals.map((row) => (
                   <tr key={row.id}>
                     <td><strong>{row.employeeName || "—"}</strong></td>
-                    <td>{LEAVE_TYPE_LABELS[row.leaveType] || row.leaveType}</td>
+                    <td>{leaveTypeLabel(row)}</td>
                     <td>
                       {String(row.startDate).slice(0, 10)} → {String(row.endDate).slice(0, 10)}
                       {row.halfDay ? <span className="row-meta">Half day</span> : null}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LEAVE_NOTICE_DAYS, LEAVE_TYPE_LABELS, LEAVE_TYPE_LIST, PERMISSIONS } from "@twm/shared";
+import { EMPLOYMENT_TYPES, LEAVE_NOTICE_DAYS, LEAVE_TYPE_LABELS, LEAVE_TYPE_LIST, PERMISSIONS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
 import { LeaveTypeBadge, fmtDate, leaveTypeLabel } from "../ui.jsx";
@@ -57,7 +57,7 @@ function LeaveBalances({ balances }) {
                 {remaining == null ? "Unlimited" : `${remaining} left`}
               </p>
               <p className="balance-meta">
-                {allotted ? `${used} used of ${allotted}` : "No yearly cap"}
+                {item.allotted == null ? "No yearly cap" : `${used} used of ${allotted}`}
                 {item.pending ? ` · ${item.pending} pending` : ""}
               </p>
               {allotted ? (
@@ -241,6 +241,9 @@ export function LeavePage() {
           <h2>Request leave</h2>
           <p className="muted leave-form-note">
             Casual and unpaid leave must be applied at least 7 days in advance. Sick leave has no notice period.
+            {user?.employee?.employmentType === EMPLOYMENT_TYPES.INTERN
+              ? " As Intern/Probation, sick leave uses your casual balance once you have no sick leave left."
+              : ""}
           </p>
           <div className="seg" role="group" aria-label="Leave type">
             {LEAVE_TYPE_LIST.map((type) => (
@@ -317,7 +320,7 @@ export function LeavePage() {
         <>
           <LeaveBalances balances={balances} />
           <section className="leave-mgmt">
-          <p className="muted">Set how many casual and sick days each person gets this year. Balances update from these numbers. Unpaid leave has no cap.</p>
+          <p className="muted">Leave is credited automatically on the 1st of every month: Full time gets 1 casual + 0.5 sick, Intern/Probation gets 1 casual (set the type on the People page). Unused leave carries into next year. You can still adjust anyone's total for this year here. Unpaid leave has no cap.</p>
           <div className="card-form-grid">
             <form
               className="card form"
