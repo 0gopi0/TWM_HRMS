@@ -10,7 +10,7 @@ import { paginated, parsePagination } from "../utils/pagination.js";
 import { HttpError } from "../utils/httpError.js";
 import { assertCanSeeEmployee } from "../services/scope.js";
 
-const leaveTypeSchema = z.enum(["sick", "casual", "unpaid"]);
+const leaveTypeSchema = z.enum(["sick", "casual", "unpaid", "wfh"]);
 
 // Leave is consumed in whole or half-day increments (see daysConsumed in
 // leaveService.js), so entitlements are kept to the same 0.5-day granularity.

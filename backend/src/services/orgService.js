@@ -1,4 +1,4 @@
-import { labelForRole } from "@twm/shared";
+import { LEAVE_TYPES, labelForRole } from "@twm/shared";
 import { getStore } from "../store/index.js";
 import { asYmd } from "./leaveService.js";
 
@@ -24,10 +24,13 @@ export function buildOrgForest(employees, usersById, statusById = new Map()) {
 }
 
 // Derive a live status for each employee:
-//   on_leave  -> has an approved leave that covers today
-//   active    -> currently clocked in (open attendance entry)
-//   inactive  -> not clocked in
-// On leave takes precedence over clock-in status.
+//   on_leave   -> has an approved leave that covers today
+//   wfh_active -> approved to work from home today, and clocked in
+//   wfh        -> approved to work from home today, not clocked in
+//   active     -> currently clocked in (open attendance entry)
+//   inactive   -> not clocked in
+// On leave takes precedence over working from home, which takes precedence
+// over plain clock-in status.
 export async function computeStatusById(store, employees) {
   const [leaveRows, attendanceRows] = await Promise.all([
     store.listLeave(),
@@ -37,17 +40,20 @@ export async function computeStatusById(store, employees) {
   // MySQL hands back DATE columns as Date objects, so normalize to YYYY-MM-DD
   // strings before comparing with `today` — same as the calendar and the
   // clock-in guard do.
+  const approvedToday = leaveRows.filter(
+    (r) => r.status === "approved" && asYmd(r.startDate) <= today && asYmd(r.endDate) >= today,
+  );
   const onLeave = new Set(
-    leaveRows
-      .filter(
-        (r) => r.status === "approved" && asYmd(r.startDate) <= today && asYmd(r.endDate) >= today,
-      )
-      .map((r) => r.employeeId),
+    approvedToday.filter((r) => r.leaveType !== LEAVE_TYPES.WFH).map((r) => r.employeeId),
+  );
+  const wfh = new Set(
+    approvedToday.filter((r) => r.leaveType === LEAVE_TYPES.WFH).map((r) => r.employeeId),
   );
   const clockedIn = new Set(attendanceRows.filter((a) => !a.clockOutAt).map((a) => a.employeeId));
   const map = new Map();
   for (const e of employees) {
     if (onLeave.has(e.id)) map.set(e.id, "on_leave");
+    else if (wfh.has(e.id)) map.set(e.id, clockedIn.has(e.id) ? "wfh_active" : "wfh");
     else if (clockedIn.has(e.id)) map.set(e.id, "active");
     else map.set(e.id, "inactive");
   }

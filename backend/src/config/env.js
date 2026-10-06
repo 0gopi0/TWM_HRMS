@@ -59,6 +59,12 @@ const schema = z.object({
     .default("")
     .transform((val) => val || process.env.SMTP_PASSWORD || ""),
   SMTP_FROM: z.string().default(""),
+  // HR inboxes copied whenever any leave or work-from-home request is
+  // approved (comma-separated). Set it empty to stop the copies.
+  LEAVE_APPROVAL_NOTIFY_EMAILS: z
+    .string()
+    .default("priya@hiretick.in,chaitali@hiretick.in")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
   PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(30),
 });
 

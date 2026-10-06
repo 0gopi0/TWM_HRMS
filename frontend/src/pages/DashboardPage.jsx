@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AUTO_CLOCKOUT_HOUR, LEAVE_TYPE_LABELS, ROLES } from "@twm/shared";
+import { AUTO_CLOCKOUT_HOUR, LEAVE_TYPE_LABELS, LEAVE_TYPES, ROLES } from "@twm/shared";
 import { useAuth } from "../auth.jsx";
 import { api } from "../api.js";
 import { SparkIcon, LeaveTypeBadge, fmtDate, leaveTypeLabel } from "../ui.jsx";
@@ -119,17 +119,28 @@ export function DashboardPage() {
   const myLeaves = useMemo(() => leaves.filter((l) => l.employeeId === myId), [leaves, myId]);
 
   // Full-day approved leave blocks clock-in; a half-day leave (of any type —
-  // sick, casual, or unpaid) still allows clocking in/out for the rest of the day.
+  // sick, casual, or unpaid) still allows clocking in/out for the rest of the
+  // day. Work from home isn't leave, so it never blocks clock-in.
   const onLeaveToday = useMemo(() => {
     const today = new Date().toLocaleDateString("en-CA");
     return myLeaves.some(
-      (l) => l.status === "approved" && !l.halfDay && l.startDate <= today && l.endDate >= today,
+      (l) =>
+        l.status === "approved" &&
+        l.leaveType !== LEAVE_TYPES.WFH &&
+        !l.halfDay &&
+        l.startDate <= today &&
+        l.endDate >= today,
     );
   }, [myLeaves]);
   const leavesThisMonth = useMemo(
     () =>
       myLeaves
-        .filter((l) => l.status === "approved" && (inMonth(l.startDate) || inMonth(l.endDate)))
+        .filter(
+          (l) =>
+            l.status === "approved" &&
+            l.leaveType !== LEAVE_TYPES.WFH &&
+            (inMonth(l.startDate) || inMonth(l.endDate)),
+        )
         .reduce((sum, l) => sum + daysInclusive(l.startDate, l.endDate) * (l.halfDay ? 0.5 : 1), 0),
     [myLeaves],
   );
@@ -206,7 +217,13 @@ export function DashboardPage() {
     }
     const onLeaveToday = new Set(
       leaves
-        .filter((l) => l.status === "approved" && l.startDate <= today && l.endDate >= today)
+        .filter(
+          (l) =>
+            l.status === "approved" &&
+            l.leaveType !== LEAVE_TYPES.WFH &&
+            l.startDate <= today &&
+            l.endDate >= today,
+        )
         .map((l) => l.employeeId),
     ).size;
     const pendingApprovals = leaves.filter((l) => String(l.status).startsWith("pending")).length;

@@ -50,6 +50,13 @@ export const LEAVE_TYPE_ICONS = {
       <path d="M14.8 9.3c0-1.3-1.25-2.3-2.8-2.3s-2.8 1-2.8 2.3c0 2.9 5.6 1.7 5.6 4.6 0 1.3-1.25 2.3-2.8 2.3s-2.8-1-2.8-2.3" />
     </>
   ),
+  wfh: (
+    <>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9v12h14V9" />
+      <path d="M10 21v-6h4v6" />
+    </>
+  ),
 };
 
 export function LeaveTypeBadge({ type, size = 18 }) {

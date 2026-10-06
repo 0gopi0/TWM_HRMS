@@ -33,6 +33,7 @@ In the Node.js app's **Environment variables** panel (do not commit a `.env` fil
 | `CLIENT_ORIGIN` | `https://yourdomain.com` |
 | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` | generate real random values — e.g. `openssl rand -hex 32` — never reuse the local-dev placeholders |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | your Hostinger mailbox — see `.env.example` and hPanel → Emails → Mailboxes → Connect apps & devices for the exact host/port for your plan |
+| `LEAVE_APPROVAL_NOTIFY_EMAILS` | optional — HR inboxes copied on every approved leave / work-from-home request, comma-separated; defaults to `priya@hiretick.in,chaitali@hiretick.in` |
 
 Leave `PORT` and `HOST` unset — Hostinger's Node.js app manager assigns and injects the real port itself, and (only in production) the app now lets real platform environment variables take priority over anything in a `.env` file that happens to be sitting on the server, specifically so this can't be clobbered.
 

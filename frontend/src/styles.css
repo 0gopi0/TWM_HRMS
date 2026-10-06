@@ -8,6 +8,7 @@
   --amber: #00c7fd;
   --amber-deep: #0068b5;
   --c-teal: #0ea5a4;
+  --c-teal-deep: #0f766e;
   --c-violet: #0068b5;
   --bg: #f3f6fc;
   --bg-elev: #ffffff;
@@ -49,6 +50,7 @@
   --amber: #00c7fd;
   --amber-deep: #0068b5;
   --c-teal: #2dd4c7;
+  --c-teal-deep: #2dd4c7;
   --c-violet: #00c7fd;
   --bg: #0a1017;
   --bg-elev: #131b2e;
@@ -983,6 +985,11 @@ input:focus, select:focus, textarea:focus {
   background: color-mix(in srgb, var(--warning) 14%, transparent);
   color: var(--warning);
 }
+/* Work from home is teal everywhere: badge, calendar chip, org chart pill. */
+.leave-type-badge.wfh {
+  background: color-mix(in srgb, var(--c-teal) 14%, transparent);
+  color: var(--c-teal-deep);
+}
 .leave-item-main {
   display: grid;
   gap: 3px;
@@ -1273,6 +1280,10 @@ input:focus, select:focus, textarea:focus {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
 }
+.cal-mark.wfh {
+  background: color-mix(in srgb, var(--c-teal) 18%, transparent);
+  color: var(--c-teal-deep);
+}
 .cal-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1291,6 +1302,7 @@ input:focus, select:focus, textarea:focus {
 .cal-swatch.festival { background: var(--amber); }
 .cal-swatch.optional { border: 1px dashed var(--accent); background: transparent; }
 .cal-swatch.leave { background: var(--accent); }
+.cal-swatch.wfh { background: var(--c-teal); }
 .cal-side { display: grid; gap: 16px; }
 .cal-detail { margin: 0 0 8px; font-size: 14px; }
 .cal-detail strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
@@ -1417,6 +1429,11 @@ input:focus, select:focus, textarea:focus {
   background: color-mix(in srgb, #4ade80 26%, transparent);
   color: #4ade80;
   border-color: color-mix(in srgb, #4ade80 55%, transparent);
+}
+.org-status--wfh {
+  background: color-mix(in srgb, var(--c-teal) 16%, transparent);
+  color: var(--c-teal-deep);
+  border-color: color-mix(in srgb, var(--c-teal) 40%, transparent);
 }
 
 .org-detail-head .org-status { margin-left: auto; }

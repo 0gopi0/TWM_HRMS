@@ -12,7 +12,7 @@ import {
 import { getStore } from "../store/index.js";
 import { HttpError } from "../utils/httpError.js";
 import { resolveActor } from "../utils/activityLog.js";
-import { notifyLeaveApplied, notifyLeaveDecided } from "./leaveNotifyService.js";
+import { notifyLeaveApplied, notifyLeaveApprovedToHr, notifyLeaveDecided } from "./leaveNotifyService.js";
 
 // Leave approval is single-level: the applicant's designated approver
 // (direct manager, or the sales-team override to the owner) makes the
@@ -31,13 +31,15 @@ export function asYmd(value) {
 
 // Whether an employee has an approved, full-day leave covering `ymd` — used
 // to block clock-in. A half-day leave still allows clocking in/out for the
-// rest of the day, regardless of leave type (sick, casual, or unpaid).
+// rest of the day, regardless of leave type (sick, casual, or unpaid). Work
+// from home isn't leave: they're working, so it never blocks clock-in.
 export async function isOnFullDayLeave(employeeId, ymd) {
   const rows = await getStore().listLeave();
   return rows.some(
     (row) =>
       row.employeeId === employeeId &&
       row.status === "approved" &&
+      row.leaveType !== LEAVE_TYPES.WFH &&
       !row.halfDay &&
       asYmd(row.startDate) <= ymd &&
       asYmd(row.endDate) >= ymd,
@@ -53,7 +55,7 @@ function daysUntil(startDate) {
 
 export function assertLeaveWindow({ leaveType, startDate, endDate, enforceNotice }) {
   if (!LEAVE_TYPE_LIST.includes(leaveType)) {
-    throw new HttpError(422, "Leave type must be sick, casual, or unpaid");
+    throw new HttpError(422, "Leave type must be sick, casual, unpaid, or work from home");
   }
   const start = asYmd(startDate);
   const end = asYmd(endDate);
@@ -231,6 +233,8 @@ function assertHalfDay(halfDay, startDate, endDate) {
 }
 
 export async function createLeaveRequest({ employee, leaveType, startDate, endDate, reason, halfDay = false }) {
+  // Work from home is for whole days only.
+  if (leaveType === LEAVE_TYPES.WFH) halfDay = false;
   assertLeaveWindow({ leaveType, startDate, endDate, enforceNotice: true });
   assertHalfDay(halfDay, startDate, endDate);
   const chargedTo = await resolveChargedBalance({ employee, leaveType, startDate, endDate, halfDay });
@@ -252,7 +256,19 @@ export async function createLeaveRequest({ employee, leaveType, startDate, endDa
       halfDay: Boolean(halfDay),
       status: "approved",
     };
-    return store.createLeave(row);
+    const created = await store.createLeave(row);
+    await notifyLeaveApprovedToHr({
+      applicantUserId: employee.userId,
+      applicantName: employee.legalName,
+      approverUserId: null,
+      decidedBy: null,
+      leaveType,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      halfDay: row.halfDay,
+      reason,
+    });
+    return created;
   }
   const row = {
     id: randomUUID(),
@@ -446,17 +462,22 @@ export async function decideLeave({ user, leaveId, decision, comment }) {
     beforeJson: { status: req.status, approverEmployeeId: req.approverEmployeeId },
     afterJson: { status: nextStatus.status, approverEmployeeId: null },
   });
-  await notifyLeaveDecided({
+  const mail = {
     applicantUserId: targetEmployee?.userId,
     applicantName: targetName,
-    decision,
     decidedBy: actorName,
     leaveType: req.leaveType,
     startDate: asYmd(req.startDate),
     endDate: asYmd(req.endDate),
     halfDay: Boolean(req.halfDay),
-    comment,
-  });
+  };
+  // The applicant hears back either way; HR is copied on approvals only.
+  await Promise.all([
+    notifyLeaveDecided({ ...mail, decision, comment }),
+    decision === "approved"
+      ? notifyLeaveApprovedToHr({ ...mail, approverUserId: user.id, reason: req.reason })
+      : null,
+  ]);
   return { leave: updated, approval };
 }
 

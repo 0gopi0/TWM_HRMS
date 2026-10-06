@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { HOLIDAY_KINDS, PERMISSIONS } from "@twm/shared";
+import { HOLIDAY_KINDS, LEAVE_TYPES, PERMISSIONS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
 
@@ -82,7 +82,7 @@ export function CalendarPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Calendar</h1>
-          <p className="page-sub">Who is off, festival holidays, and optional holidays for the team.</p>
+          <p className="page-sub">Who is off or working from home, festival holidays, and optional holidays for the team.</p>
         </div>
       </div>
       {error ? <p className="error">{error}</p> : null}
@@ -156,7 +156,7 @@ export function CalendarPage() {
                       </li>
                     ))}
                     {leaves.map((l) => (
-                      <li key={l.id} className="cal-mark leave">
+                      <li key={l.id} className={`cal-mark ${l.leaveType === LEAVE_TYPES.WFH ? "wfh" : "leave"}`}>
                         {l.name}
                       </li>
                     ))}
@@ -175,6 +175,9 @@ export function CalendarPage() {
             <span>
               <i className="cal-swatch leave" /> On leave
             </span>
+            <span>
+              <i className="cal-swatch wfh" /> Work from home
+            </span>
           </div>
         </article>
 
@@ -190,8 +193,8 @@ export function CalendarPage() {
               </p>
             ))}
             {dayLeaves.map((l) => (
-              <p key={l.id} className="cal-detail leave">
-                <strong>{l.name}</strong> on {l.leaveType} leave
+              <p key={l.id} className={`cal-detail ${l.leaveType === LEAVE_TYPES.WFH ? "wfh" : "leave"}`}>
+                <strong>{l.name}</strong> {l.leaveType === LEAVE_TYPES.WFH ? "working from home" : `on ${l.leaveType} leave`}
                 {l.startDate !== l.endDate ? ` (${l.startDate} → ${l.endDate})` : ""}
               </p>
             ))}

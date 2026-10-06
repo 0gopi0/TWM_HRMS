@@ -30,6 +30,8 @@ const STATUS_META = {
   active: { label: "Clocked in", cls: "active" },
   inactive: { label: "Off the clock", cls: "inactive" },
   on_leave: { label: "On leave", cls: "on_leave" },
+  wfh_active: { label: "WFH · Clocked in", cls: "wfh" },
+  wfh: { label: "WFH · Off the clock", cls: "wfh" },
 };
 
 function Chevron({ collapsed }) {

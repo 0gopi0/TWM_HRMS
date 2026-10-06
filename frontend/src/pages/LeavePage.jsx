@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { EMPLOYMENT_TYPES, LEAVE_NOTICE_DAYS, LEAVE_TYPE_LABELS, LEAVE_TYPE_LIST, PERMISSIONS } from "@twm/shared";
+import { EMPLOYMENT_TYPES, LEAVE_NOTICE_DAYS, LEAVE_TYPE_LABELS, LEAVE_TYPE_LIST, LEAVE_TYPES, PERMISSIONS } from "@twm/shared";
 import { api } from "../api.js";
 import { useAuth } from "../auth.jsx";
 import { LeaveTypeBadge, fmtDate, leaveTypeLabel } from "../ui.jsx";
@@ -238,12 +238,13 @@ export function LeavePage() {
             }
           }}
         >
-          <h2>Request leave</h2>
+          <h2>{form.leaveType === LEAVE_TYPES.WFH ? "Request work from home" : "Request leave"}</h2>
           <p className="muted leave-form-note">
             Casual and unpaid leave must be applied at least 7 days in advance. Sick leave has no notice period.
             {user?.employee?.employmentType === EMPLOYMENT_TYPES.INTERN
               ? " As Intern/Probation, sick leave uses your casual balance once you have no sick leave left."
               : ""}
+            {" "}Work from home can be requested any time and doesn't use your leave balance.
           </p>
           <div className="seg" role="group" aria-label="Leave type">
             {LEAVE_TYPE_LIST.map((type) => (
@@ -259,10 +260,13 @@ export function LeavePage() {
                     leaveType: type,
                     startDate: form.startDate && form.startDate < min ? min : form.startDate || min,
                     endDate: form.endDate && form.endDate < min ? min : form.endDate || min,
+                    // Work from home is for whole days only.
+                    halfDay: type === LEAVE_TYPES.WFH ? false : form.halfDay,
                   });
                 }}
               >
-                {LEAVE_TYPE_LABELS[type].replace(" leave", "")}
+                {/* Short label so four options fit the toggle on a phone. */}
+                {type === LEAVE_TYPES.WFH ? "WFH" : LEAVE_TYPE_LABELS[type].replace(" leave", "")}
               </button>
             ))}
           </div>
@@ -295,7 +299,7 @@ export function LeavePage() {
               />
             </label>
           </div>
-          {form.startDate && form.startDate === form.endDate ? (
+          {form.leaveType !== LEAVE_TYPES.WFH && form.startDate && form.startDate === form.endDate ? (
             <label className="half-day">
               <input
                 type="checkbox"

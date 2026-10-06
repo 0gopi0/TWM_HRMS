@@ -121,6 +121,10 @@ export const LEAVE_TYPES = Object.freeze({
   SICK: "sick",
   CASUAL: "casual",
   UNPAID: "unpaid",
+  // Work from home isn't time off: it has no balance and no notice period,
+  // and never blocks clocking in. It's requested and approved like leave so
+  // it shows on the calendar and the org chart.
+  WFH: "wfh",
 });
 
 export const LEAVE_TYPE_LIST = Object.freeze(Object.values(LEAVE_TYPES));
@@ -129,12 +133,14 @@ export const LEAVE_NOTICE_DAYS = Object.freeze({
   [LEAVE_TYPES.SICK]: 0,
   [LEAVE_TYPES.CASUAL]: 7,
   [LEAVE_TYPES.UNPAID]: 7,
+  [LEAVE_TYPES.WFH]: 0,
 });
 
 export const LEAVE_TYPE_LABELS = Object.freeze({
   [LEAVE_TYPES.SICK]: "Sick leave",
   [LEAVE_TYPES.CASUAL]: "Casual leave",
   [LEAVE_TYPES.UNPAID]: "Unpaid leave",
+  [LEAVE_TYPES.WFH]: "Work from home",
 });
 
 export const LEAVE_ENTITLEMENTS = Object.freeze({
