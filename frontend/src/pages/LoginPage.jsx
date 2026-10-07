@@ -106,6 +106,9 @@ export function LoginPage() {
           <button className="btn btn-primary login-submit" type="submit" disabled={busy}>
             {busy ? "Signing in…" : "Continue"}
           </button>
+          <p className="muted" style={{ margin: 0, fontSize: 12, textAlign: "center" }}>
+            <Link to="/privacy-policy">Privacy Policy</Link>
+          </p>
         </form>
       </div>
     </div>

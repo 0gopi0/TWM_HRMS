@@ -13,6 +13,7 @@ import { PayrollPage } from "./pages/PayrollPage.jsx";
 import { OrgPage } from "./pages/OrgPage.jsx";
 import { CalendarPage } from "./pages/CalendarPage.jsx";
 import { ActivityLogPage } from "./pages/ActivityLogPage.jsx";
+import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage.jsx";
 
 // No matching route (typo, stale bookmark, removed page) — a real page
 // instead of react-router-dom silently rendering nothing.
@@ -56,6 +57,7 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route
         path="/"
         element={
