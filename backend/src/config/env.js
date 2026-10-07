@@ -63,7 +63,7 @@ const schema = z.object({
   // approved (comma-separated). Set it empty to stop the copies.
   LEAVE_APPROVAL_NOTIFY_EMAILS: z
     .string()
-    .default("priya@hiretick.in,chaitali@hiretick.in")
+    .default("hr@thewebsitemakers.in")
     .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
   PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(30),
 });
