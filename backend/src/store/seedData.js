@@ -13,6 +13,7 @@ const DEPARTMENTS = [
   { id: "dept-web", name: "Web Development" },
   { id: "dept-marketing", name: "Marketing & Media" },
   { id: "dept-digital-marketing", name: "Digital Marketing" },
+  { id: "dept-social-media-management", name: "Social Media and Digital Marketing Management" },
 ];
 
 const TEAMS = [

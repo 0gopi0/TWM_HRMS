@@ -123,6 +123,14 @@ export async function migrate() {
     await conn.query(sql);
     await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["016_leave_charged_to"]);
   }
+  const [smm] = await conn.query("SELECT id FROM schema_migrations WHERE id = ?", [
+    "017_social_media_management",
+  ]);
+  if (smm.length === 0) {
+    const sql = await readFile(resolve(dir, "../../sql/017_social_media_management_department.sql"), "utf8");
+    await conn.query(sql);
+    await conn.query("INSERT INTO schema_migrations (id) VALUES (?)", ["017_social_media_management"]);
+  }
   await conn.end();
 }
 
